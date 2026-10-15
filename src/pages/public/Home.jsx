@@ -334,7 +334,7 @@ const Home = () => {
                 to='/register'
                 className='inline-flex items-center gap-2 bg-white hover:bg-teal-50 text-teal-800 px-10 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-1'
               >
-                إنشاء حساب مجاني
+                إنشاء حساب
                 <ArrowLeft size={20} />
               </Link>
             </div>
