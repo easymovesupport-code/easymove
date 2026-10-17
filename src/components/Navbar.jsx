@@ -1,6 +1,17 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 const Navbar = () => {
+  const location = useLocation();
+
+  const isActive = (path) => location.pathname === path;
+
+  const linkClass = (path) =>
+    `font-medium transition-colors duration-200 pb-1 border-b-2 ${
+      isActive(path)
+        ? "text-teal-700 border-teal-600"
+        : "text-slate-600 border-transparent hover:text-teal-700 hover:border-teal-300"
+    }`;
+
   return (
     <nav className='bg-white/90 backdrop-blur-md shadow-sm border-b border-stone-200/80 sticky top-0 z-50'>
       <div className='max-w-7xl mx-auto px-6 py-4 flex justify-between items-center'>
@@ -14,22 +25,13 @@ const Navbar = () => {
 
         {/* Links */}
         <div className='hidden md:flex items-center gap-8'>
-          <Link
-            to='/'
-            className='text-slate-600 hover:text-teal-700 font-medium transition-colors duration-200'
-          >
+          <Link to='/' className={linkClass("/")}>
             الرئيسية
           </Link>
-          <Link
-            to='/about'
-            className='text-slate-600 hover:text-teal-700 font-medium transition-colors duration-200'
-          >
+          <Link to='/about' className={linkClass("/about")}>
             من نحن
           </Link>
-          <Link
-            to='/contact'
-            className='text-slate-600 hover:text-teal-700 font-medium transition-colors duration-200'
-          >
+          <Link to='/contact' className={linkClass("/contact")}>
             تواصل معنا
           </Link>
 
