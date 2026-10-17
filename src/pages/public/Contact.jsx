@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Mail, Phone, MapPin, Send, CheckCircle2 } from "lucide-react";
+import { supabase } from "../../lib/supabase";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -8,14 +9,34 @@ const Contact = () => {
     message: "",
   });
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // لاحقاً هنربطه بـ Backend
+    setLoading(true);
+    setError("");
+
+    const { error } = await supabase.from("contact_messages").insert([
+      {
+        name: formData.name,
+        email: formData.email,
+        message: formData.message,
+      },
+    ]);
+
+    setLoading(false);
+
+    if (error) {
+      console.error(error);
+      setError("حدث خطأ أثناء الإرسال. حاولي مرة أخرى.");
+      return;
+    }
+
     setSent(true);
     setFormData({ name: "", email: "", message: "" });
     setTimeout(() => setSent(false), 4000);
@@ -169,11 +190,16 @@ const Contact = () => {
 
                     <button
                       type='submit'
-                      className='w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white px-8 py-3.5 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg'
+                      disabled={loading}
+                      className='w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white px-8 py-3.5 rounded-xl font-semibold transition-all duration-300 shadow-md hover:shadow-lg'
                     >
-                      إرسال الرسالة
-                      <Send size={18} />
+                      {loading ? "جاري الإرسال..." : "إرسال الرسالة"}
+                      {!loading && <Send size={18} />}
                     </button>
+
+                    {error && (
+                      <p className='text-red-600 text-sm mt-2'>{error}</p>
+                    )}
                   </form>
                 )}
               </div>
