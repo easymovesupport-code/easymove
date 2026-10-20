@@ -50,7 +50,7 @@ const Login = () => {
     if (type === "volunteer") {
       navigate("/volunteer/dashboard");
     } else {
-      navigate("/disabled/dashboard");
+      navigate("/disabled/Dashboard");
     }
   };
 

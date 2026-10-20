@@ -7,6 +7,7 @@ import Footer from "./components/Footer";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import AdminLogin from "./pages/auth/AdminLogin";
+import DisabledDashboard from "./pages/disabled/Dashboard";
 
 const App = () => {
   return (
@@ -21,7 +22,8 @@ const App = () => {
             <Route path='/contact' element={<Contact />} />
             <Route path='/login' element={<Login />} />
             <Route path='/register' element={<Register />} />
-            <Route path='/admin/login' element={<AdminLogin />} />;
+            <Route path='/admin/login' element={<AdminLogin />} />
+            <Route path='/disabled/Dashboard' element={<DisabledDashboard />} />
           </Routes>
         </main>
 
