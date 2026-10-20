@@ -36,7 +36,7 @@ const Navbar = () => {
           </Link>
 
           <Link
-            to='/login'
+            to='/admin/login'
             className='bg-teal-700 hover:bg-teal-800 text-white px-5 py-2.5 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md'
           >
             تسجيل الدخول

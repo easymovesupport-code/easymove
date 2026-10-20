@@ -111,14 +111,14 @@ const Home = () => {
 
           <div className='flex flex-col sm:flex-row gap-4 justify-center'>
             <Link
-              to='/register'
+              to='/login?type=disabled'
               className='inline-flex items-center justify-center gap-2 bg-white text-teal-800 hover:bg-teal-50 px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-xl hover:shadow-2xl hover:-translate-y-1'
             >
               طلب مساعدة الآن
               <ArrowLeft size={20} />
             </Link>
             <Link
-              to='/register'
+              to='/login?type=volunteer'
               className='inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border-2 border-white/25 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300'
             >
               انضم كمتطوع
