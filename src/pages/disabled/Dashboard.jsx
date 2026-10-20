@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "../../lib/supabase";
 import {
   Stethoscope,
   HandHeart,
@@ -8,48 +10,101 @@ import {
   Clock,
   ChevronLeft,
   Bell,
+  LogOut,
 } from "lucide-react";
 
 const DisabledDashboard = () => {
-  // بيانات تجريبية مؤقتة (لاحقاً من Supabase)
-  const userName = "أحمد";
-  const stats = {
-    activeRequests: 1,
-    completedRequests: 4,
-    messages: 2,
-  };
-
-  const recentRequests = [
-    {
-      id: 1,
-      title: "مساعدة في موعد طبي",
-      status: "accepted",
-      date: "اليوم • 3:00 م",
-    },
-    {
-      id: 2,
-      title: "مرافقة للتسوق",
-      status: "pending",
-      date: "أمس • 11:30 ص",
-    },
-    {
-      id: 3,
-      title: "مساعدة في التنقل",
-      status: "completed",
-      date: "قبل 3 أيام",
-    },
-  ];
+  const navigate = useNavigate();
+  const [userName, setUserName] = useState("");
+  const [, setUserId] = useState(null); // userId
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    activeRequests: 0,
+    completedRequests: 0,
+    messages: 0,
+  });
+  const [recentRequests, setRecentRequests] = useState([]);
 
   const statusStyle = {
     pending: "bg-amber-50 text-amber-700 border-amber-200",
     accepted: "bg-emerald-50 text-emerald-700 border-emerald-200",
     completed: "bg-slate-100 text-slate-600 border-slate-200",
+    cancelled: "bg-red-50 text-red-600 border-red-200",
   };
 
   const statusLabel = {
     pending: "قيد الانتظار",
     accepted: "مقبول",
     completed: "مكتمل",
+    cancelled: "ملغي",
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+
+      // 1) المستخدم الحالي من Auth
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData?.user) {
+        navigate("/login?type=disabled");
+        return;
+      }
+
+      // 2) بيانات المستخدم من جدول users
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("id, name")
+        .eq("email", authData.user.email)
+        .eq("user_type", "disabled")
+        .single();
+
+      if (!userRow) {
+        navigate("/login?type=disabled");
+        return;
+      }
+
+      setUserName(userRow.name || "مستخدم");
+      setUserId(userRow.id);
+
+      // 3) الطلبات من help_requests
+      const { data: requests } = await supabase
+        .from("help_requests")
+        .select("id, title, status, created_at, location")
+        .eq("user_id", userRow.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      const list = requests || [];
+      setRecentRequests(list);
+
+      setStats({
+        activeRequests: list.filter((r) =>
+          ["pending", "accepted"].includes(r.status),
+        ).length,
+        completedRequests: list.filter((r) => r.status === "completed").length,
+        messages: list.filter((r) => r.status === "accepted").length,
+      });
+
+      setLoading(false);
+    };
+
+    loadData();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
+
+  const formatDate = (value) => {
+    if (!value) return "";
+    return new Date(value).toLocaleString("ar-SA", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const services = [
@@ -58,7 +113,6 @@ const DisabledDashboard = () => {
       desc: "ابحث عن أطباء متخصصين في الإعاقة الحركية قرب موقعك",
       icon: <Stethoscope size={26} />,
       to: "/disabled/doctors",
-      color: "from-teal-600 to-teal-700",
       iconBg: "bg-teal-50 text-teal-700",
     },
     {
@@ -66,7 +120,6 @@ const DisabledDashboard = () => {
       desc: "اطلب مساعدة فورية أو مجدولة من متطوع موثوق",
       icon: <HandHeart size={26} />,
       to: "/disabled/request-help",
-      color: "from-emerald-600 to-emerald-700",
       iconBg: "bg-emerald-50 text-emerald-700",
     },
     {
@@ -74,28 +127,70 @@ const DisabledDashboard = () => {
       desc: "تواصل مع المتطوع بعد قبول طلب المساعدة",
       icon: <MessageCircle size={26} />,
       to: "/disabled/messages",
-      color: "from-cyan-600 to-cyan-700",
       iconBg: "bg-cyan-50 text-cyan-700",
     },
   ];
+
+  if (loading) {
+    return (
+      <div
+        className='min-h-screen bg-stone-50 flex items-center justify-center'
+        dir='rtl'
+      >
+        <p className='text-slate-500'>جاري التحميل...</p>
+      </div>
+    );
+  }
 
   return (
     <div className='min-h-screen bg-stone-50' dir='rtl'>
       {/* Top Bar */}
       <header className='bg-white border-b border-stone-200 sticky top-0 z-40'>
         <div className='max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between'>
-          <div>
-            <Link to='/' className='text-xl font-bold text-teal-800'>
-              Easy<span className='text-teal-500'>Move</span>
-            </Link>
-          </div>
+          <Link
+            to='/disabled/dashboard'
+            className='text-xl font-bold text-teal-800'
+          >
+            Easy<span className='text-teal-500'>Move</span>
+          </Link>
+
           <div className='flex items-center gap-3'>
-            <button className='relative p-2 rounded-xl hover:bg-stone-100 text-slate-600 transition-colors'>
+            {/* إشعارات - حالياً شكلية */}
+            <button
+              type='button'
+              title='الإشعارات قريباً'
+              className='relative p-2 rounded-xl hover:bg-stone-100 text-slate-600 transition-colors'
+            >
               <Bell size={20} />
-              <span className='absolute top-1.5 left-1.5 w-2 h-2 bg-red-500 rounded-full'></span>
             </button>
-            <div className='w-9 h-9 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-sm'>
-              {userName.charAt(0)}
+
+            {/* قائمة المستخدم */}
+            <div className='relative'>
+              <button
+                type='button'
+                onClick={() => setMenuOpen((v) => !v)}
+                className='w-9 h-9 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-sm hover:bg-teal-200 transition-colors'
+              >
+                {userName?.charAt(0) || "م"}
+              </button>
+
+              {menuOpen && (
+                <div className='absolute left-0 mt-2 w-44 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden z-50'>
+                  <div className='px-4 py-3 border-b border-stone-100'>
+                    <p className='text-sm font-semibold text-slate-900 truncate'>
+                      {userName}
+                    </p>
+                  </div>
+                  <button
+                    type='button'
+                    onClick={handleLogout}
+                    className='w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors'
+                  >
+                    <LogOut size={16} />
+                    تسجيل الخروج
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -105,15 +200,13 @@ const DisabledDashboard = () => {
         {/* Welcome */}
         <section className='relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-teal-800 to-slate-900 text-white p-8 md:p-10 shadow-xl'>
           <div className='absolute -top-16 -left-16 w-56 h-56 bg-teal-400/20 rounded-full blur-3xl'></div>
-          <div className='absolute bottom-0 right-0 w-40 h-40 bg-emerald-400/15 rounded-full blur-2xl'></div>
-
           <div className='relative'>
             <p className='text-teal-100 text-sm mb-2'>مرحباً بك مجدداً 👋</p>
             <h1 className='text-3xl md:text-4xl font-bold mb-3'>
               أهلاً، {userName}
             </h1>
-            <p className='text-teal-100/90 max-w-xl leading-relaxed'>
-              من هنا يمكنك طلب المساعدة، متابعة طلباتك، والوصول لأقرب الأطباء
+            <p className='text-teal-100/90 max-w-3xl leading-relaxed'>
+              من هنا يمكنك طلب المساعدة ومتابعة طلباتك والوصول لأقرب الأطباء
               المتخصصين بسهولة.
             </p>
           </div>
@@ -135,7 +228,7 @@ const DisabledDashboard = () => {
               tone: "text-teal-700 bg-teal-50",
             },
             {
-              label: "رسائل جديدة",
+              label: "محادثات نشطة",
               value: stats.messages,
               icon: <MessageCircle size={18} />,
               tone: "text-cyan-700 bg-cyan-50",
@@ -162,10 +255,7 @@ const DisabledDashboard = () => {
 
         {/* Services */}
         <section>
-          <div className='flex items-center justify-between mb-4'>
-            <h2 className='text-xl font-bold text-slate-900'>الخدمات</h2>
-          </div>
-
+          <h2 className='text-xl font-bold text-slate-900 mb-4'>الخدمات</h2>
           <div className='grid grid-cols-1 md:grid-cols-3 gap-5'>
             {services.map((service) => (
               <Link
@@ -208,43 +298,37 @@ const DisabledDashboard = () => {
             </Link>
           </div>
 
-          <div className='divide-y divide-stone-100'>
-            {recentRequests.map((req) => (
-              <div
-                key={req.id}
-                className='px-6 py-4 flex items-center justify-between gap-4 hover:bg-stone-50 transition-colors'
-              >
-                <div className='min-w-0'>
-                  <p className='font-semibold text-slate-900 truncate'>
-                    {req.title}
-                  </p>
-                  <p className='text-sm text-slate-500 mt-0.5 flex items-center gap-1'>
-                    <MapPin size={14} />
-                    {req.date}
-                  </p>
-                </div>
-                <span
-                  className={`shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border ${statusStyle[req.status]}`}
+          {recentRequests.length === 0 ? (
+            <div className='px-6 py-10 text-center text-slate-500 text-sm'>
+              لا توجد طلبات بعد. ابدأ بإنشاء طلب مساعدة جديد.
+            </div>
+          ) : (
+            <div className='divide-y divide-stone-100'>
+              {recentRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className='px-6 py-4 flex items-center justify-between gap-4 hover:bg-stone-50 transition-colors'
                 >
-                  {statusLabel[req.status]}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Tip */}
-        <section className='rounded-2xl bg-teal-50 border border-teal-100 p-5 flex items-start gap-3'>
-          <div className='w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0'>
-            <HandHeart size={20} />
-          </div>
-          <div>
-            <h3 className='font-bold text-teal-900 mb-1'>نصيحة سريعة</h3>
-            <p className='text-sm text-teal-800/90 leading-relaxed'>
-              عند قبول المتطوع لطلبك، سيظهر زر التواصل مباشرة من صفحة الطلبات
-              لتسهيل التنسيق بينكما.
-            </p>
-          </div>
+                  <div className='min-w-0'>
+                    <p className='font-semibold text-slate-900 truncate'>
+                      {req.title}
+                    </p>
+                    <p className='text-sm text-slate-500 mt-0.5 flex items-center gap-1'>
+                      <MapPin size={14} />
+                      {req.location || formatDate(req.created_at)}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border ${
+                      statusStyle[req.status] || statusStyle.pending
+                    }`}
+                  >
+                    {statusLabel[req.status] || req.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>
