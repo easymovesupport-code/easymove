@@ -9,6 +9,7 @@ import Register from "./pages/auth/Register";
 import AdminLogin from "./pages/auth/AdminLogin";
 import DisabledDashboard from "./pages/disabled/Dashboard";
 import RequestHelp from "./pages/disabled/RequestHelp";
+import EditRequest from "./pages/disabled/EditRequest";
 
 // مكوّن داخلي عشان useLocation يشتغل صح
 const AppLayout = () => {
@@ -33,7 +34,7 @@ const AppLayout = () => {
           <Route path='/admin/login' element={<AdminLogin />} />
           <Route path='/disabled/dashboard' element={<DisabledDashboard />} />
           <Route path='/disabled/request-help' element={<RequestHelp />} />
-          <Route path='/disabled/edit-request/:id' element={<RequestHelp />} />
+          <Route path='/disabled/edit-request/:id' element={<EditRequest />} />
         </Routes>
       </main>
 

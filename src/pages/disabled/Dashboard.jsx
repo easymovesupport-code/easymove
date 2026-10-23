@@ -315,22 +315,43 @@ const DisabledDashboard = () => {
               {recentRequests.map((req) => (
                 <div
                   key={req.id}
-                  className='px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-stone-50 transition-colors'
+                  className='px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-stone-50 transition-colors'
                 >
-                  <div className='min-w-0 space-y-1'>
-                    <p className='font-semibold text-slate-900 truncate'>
+                  {/* البيانات */}
+                  <div className='min-w-0 flex-1'>
+                    <p className='font-bold text-slate-900 text-base mb-3'>
                       {req.title}
                     </p>
-                    <p className='text-sm text-slate-500'>
-                      الوقت: {formatTime(req.request_time)} • اليوم:{" "}
-                      {formatDay(req.request_date)} • التاريخ:{" "}
-                      {formatDate(req.request_date)}
-                    </p>
+
+                    <div className='flex flex-wrap gap-2'>
+                      <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
+                        <Clock size={14} className='text-teal-600' />
+                        {/* <span className='text-slate-500'>الوقت:</span> */}
+                        <strong>{formatTime(req.request_time)}</strong>
+                      </span>
+
+                      <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
+                        <span className='text-teal-600 text-xs font-bold'>
+                          يوم:
+                        </span>
+                        {/* <span className='text-slate-500'>اليوم:</span> */}
+                        <strong>{formatDay(req.request_date)}</strong>
+                      </span>
+
+                      <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
+                        <span className='text-teal-600 text-xs font-bold'>
+                          تاريخ:
+                        </span>
+                        {/* <span className='text-slate-500'>التاريخ:</span> */}
+                        <strong>{formatDate(req.request_date)}</strong>
+                      </span>
+                    </div>
                   </div>
 
-                  <div className='flex items-center gap-2 shrink-0'>
+                  {/* الحالة + التعديل */}
+                  <div className='flex items-center gap-3 shrink-0'>
                     <span
-                      className={`text-xs font-medium px-3 py-1.5 rounded-full border ${
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
                         statusStyle[req.status] || statusStyle.pending
                       }`}
                     >
@@ -339,9 +360,9 @@ const DisabledDashboard = () => {
 
                     <Link
                       to={`/disabled/edit-request/${req.id}`}
-                      className='text-sm font-semibold text-teal-700 hover:text-teal-800 px-3 py-1.5 rounded-lg hover:bg-teal-50 transition-colors'
+                      className='inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all'
                     >
-                      تعديل
+                      تعديل الطلب
                     </Link>
                   </div>
                 </div>
