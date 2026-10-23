@@ -8,6 +8,7 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import AdminLogin from "./pages/auth/AdminLogin";
 import DisabledDashboard from "./pages/disabled/Dashboard";
+import RequestHelp from "./pages/disabled/RequestHelp";
 
 // مكوّن داخلي عشان useLocation يشتغل صح
 const AppLayout = () => {
@@ -31,6 +32,7 @@ const AppLayout = () => {
           <Route path='/register' element={<Register />} />
           <Route path='/admin/login' element={<AdminLogin />} />
           <Route path='/disabled/dashboard' element={<DisabledDashboard />} />
+          <Route path='/disabled/request-help' element={<RequestHelp />} />
         </Routes>
       </main>
 
