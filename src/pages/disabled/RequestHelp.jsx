@@ -1,14 +1,8 @@
+import LocationPicker from "../../components/LocationPicker";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import {
-  ArrowRight,
-  HandHeart,
-  MapPin,
-  FileText,
-  Clock,
-  CheckCircle2,
-} from "lucide-react";
+import { ArrowRight, HandHeart, CheckCircle2 } from "lucide-react";
 
 const HELP_TYPES = [
   "مساعدة في التنقل",
@@ -25,14 +19,15 @@ const RequestHelp = () => {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [position, setPosition] = useState(null); // { lat, lng }
+  const [locationText, setLocationText] = useState("");
 
   const [form, setForm] = useState({
     help_type: "",
     title: "",
+    request_time: "",
+    request_date: "",
     description: "",
-    location: "",
-    is_scheduled: false,
-    scheduled_at: "",
   });
 
   useEffect(() => {
@@ -75,8 +70,14 @@ const RequestHelp = () => {
     setError("");
     setSubmitting(true);
 
-    if (!form.help_type || !form.title || !form.location) {
-      setError("يرجى تعبئة الحقول المطلوبة");
+    if (
+      !form.help_type ||
+      !form.title ||
+      !form.request_time ||
+      !form.request_date ||
+      !position
+    ) {
+      setError("يرجى تعبئة جميع الحقول المطلوبة وتحديد الموقع");
       setSubmitting(false);
       return;
     }
@@ -86,12 +87,13 @@ const RequestHelp = () => {
       title: form.title,
       help_type: form.help_type,
       description: form.description || null,
-      location: form.location,
+      location: locationText || `${position.lat}, ${position.lng}`,
+      latitude: position.lat,
+      longitude: position.lng,
+      request_date: form.request_date,
+      request_time: form.request_time,
       status: "pending",
-      scheduled_at:
-        form.is_scheduled && form.scheduled_at ? form.scheduled_at : null,
     };
-
     const { error: insertError } = await supabase
       .from("help_requests")
       .insert([payload]);
@@ -178,7 +180,7 @@ const RequestHelp = () => {
           onSubmit={handleSubmit}
           className='bg-white rounded-3xl border border-stone-200 shadow-sm p-6 md:p-8 space-y-5'
         >
-          {/* نوع المساعدة */}
+          {/* 1) نوع المساعدة */}
           <div>
             <label className='block text-sm font-medium text-slate-700 mb-2'>
               نوع المساعدة <span className='text-red-500'>*</span>
@@ -189,7 +191,11 @@ const RequestHelp = () => {
                   key={type}
                   type='button'
                   onClick={() =>
-                    setForm((p) => ({ ...p, help_type: type, title: type }))
+                    setForm((p) => ({
+                      ...p,
+                      help_type: type,
+                      title: p.title || type,
+                    }))
                   }
                   className={`px-4 py-2 rounded-full text-sm border transition-all ${
                     form.help_type === type
@@ -203,51 +209,61 @@ const RequestHelp = () => {
             </div>
           </div>
 
-          {/* عنوان الطلب */}
+          {/* 2) عنوان الطلب */}
           <div>
             <label className='block text-sm font-medium text-slate-700 mb-2'>
               عنوان الطلب <span className='text-red-500'>*</span>
             </label>
-            <div className='relative'>
-              <FileText
-                className='absolute right-3 top-1/2 -translate-y-1/2 text-slate-400'
-                size={18}
-              />
-              <input
-                type='text'
-                name='title'
-                value={form.title}
-                onChange={handleChange}
-                required
-                placeholder='مثال: مرافقة لموعد علاج طبيعي'
-                className='w-full pr-10 pl-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all'
-              />
-            </div>
+            <input
+              type='text'
+              name='title'
+              value={form.title}
+              onChange={handleChange}
+              required
+              placeholder='مثال: مرافقة لموعد علاج طبيعي'
+              className='w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all'
+            />
           </div>
 
-          {/* الموقع */}
+          {/* 3) الوقت */}
           <div>
             <label className='block text-sm font-medium text-slate-700 mb-2'>
-              الموقع / العنوان <span className='text-red-500'>*</span>
+              الوقت <span className='text-red-500'>*</span>
             </label>
-            <div className='relative'>
-              <MapPin
-                className='absolute right-3 top-1/2 -translate-y-1/2 text-slate-400'
-                size={18}
-              />
-              <input
-                type='text'
-                name='location'
-                value={form.location}
-                onChange={handleChange}
-                required
-                placeholder='مثال: الرياض، حي النرجس'
-                className='w-full pr-10 pl-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all'
-              />
-            </div>
+            <input
+              type='time'
+              name='request_time'
+              value={form.request_time}
+              onChange={handleChange}
+              required
+              className='w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all'
+            />
           </div>
 
-          {/* الوصف */}
+          {/* 4) التاريخ */}
+          <div>
+            <label className='block text-sm font-medium text-slate-700 mb-2'>
+              التاريخ <span className='text-red-500'>*</span>
+            </label>
+            <input
+              type='date'
+              name='request_date'
+              value={form.request_date}
+              onChange={handleChange}
+              required
+              className='w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all'
+            />
+          </div>
+
+          {/* 5) الموقع */}
+          <LocationPicker
+            position={position}
+            setPosition={setPosition}
+            locationText={locationText}
+            setLocationText={setLocationText}
+          />
+
+          {/* 6) تفاصيل إضافية */}
           <div>
             <label className='block text-sm font-medium text-slate-700 mb-2'>
               تفاصيل إضافية
@@ -260,33 +276,6 @@ const RequestHelp = () => {
               placeholder='اكتبي أي تفاصيل تساعد المتطوع على فهم الطلب...'
               className='w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all resize-none'
             />
-          </div>
-
-          {/* جدولة */}
-          <div className='rounded-2xl border border-stone-200 bg-stone-50 p-4 space-y-3'>
-            <label className='flex items-center gap-3 cursor-pointer'>
-              <input
-                type='checkbox'
-                name='is_scheduled'
-                checked={form.is_scheduled}
-                onChange={handleChange}
-                className='w-4 h-4 accent-teal-700'
-              />
-              <span className='text-sm font-medium text-slate-700 flex items-center gap-2'>
-                <Clock size={16} />
-                جدولة الطلب لوقت لاحق
-              </span>
-            </label>
-
-            {form.is_scheduled && (
-              <input
-                type='datetime-local'
-                name='scheduled_at'
-                value={form.scheduled_at}
-                onChange={handleChange}
-                className='w-full px-4 py-3 rounded-xl border border-stone-200 bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none'
-              />
-            )}
           </div>
 
           {error && (

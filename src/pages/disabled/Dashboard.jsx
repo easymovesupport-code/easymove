@@ -6,7 +6,6 @@ import {
   HandHeart,
   MessageCircle,
   ClipboardList,
-  MapPin,
   Clock,
   ChevronLeft,
   Bell,
@@ -70,7 +69,7 @@ const DisabledDashboard = () => {
       // 3) الطلبات من help_requests
       const { data: requests } = await supabase
         .from("help_requests")
-        .select("id, title, status, created_at, location")
+        .select("id, title, status, request_date, request_time, created_at")
         .eq("user_id", userRow.id)
         .order("created_at", { ascending: false })
         .limit(5);
@@ -97,13 +96,18 @@ const DisabledDashboard = () => {
     navigate("/");
   };
 
-  const formatDate = (value) => {
-    if (!value) return "";
-    return new Date(value).toLocaleString("ar-SA", {
+  const formatTime = (time) => {
+    if (!time) return "—";
+    // time قد يأتي بصيغة HH:MM:SS
+    return time.slice(0, 5);
+  };
+
+  const formatDate = (date) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("ar-SA", {
+      year: "numeric",
+      month: "long",
       day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   };
 
@@ -142,6 +146,10 @@ const DisabledDashboard = () => {
     );
   }
 
+  const formatDay = (date) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("ar-SA", { weekday: "long" });
+  };
   return (
     <div className='min-h-screen bg-stone-50' dir='rtl'>
       {/* Top Bar */}
@@ -307,24 +315,35 @@ const DisabledDashboard = () => {
               {recentRequests.map((req) => (
                 <div
                   key={req.id}
-                  className='px-6 py-4 flex items-center justify-between gap-4 hover:bg-stone-50 transition-colors'
+                  className='px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-stone-50 transition-colors'
                 >
-                  <div className='min-w-0'>
+                  <div className='min-w-0 space-y-1'>
                     <p className='font-semibold text-slate-900 truncate'>
                       {req.title}
                     </p>
-                    <p className='text-sm text-slate-500 mt-0.5 flex items-center gap-1'>
-                      <MapPin size={14} />
-                      {req.location || formatDate(req.created_at)}
+                    <p className='text-sm text-slate-500'>
+                      الوقت: {formatTime(req.request_time)} • اليوم:{" "}
+                      {formatDay(req.request_date)} • التاريخ:{" "}
+                      {formatDate(req.request_date)}
                     </p>
                   </div>
-                  <span
-                    className={`shrink-0 text-xs font-medium px-3 py-1.5 rounded-full border ${
-                      statusStyle[req.status] || statusStyle.pending
-                    }`}
-                  >
-                    {statusLabel[req.status] || req.status}
-                  </span>
+
+                  <div className='flex items-center gap-2 shrink-0'>
+                    <span
+                      className={`text-xs font-medium px-3 py-1.5 rounded-full border ${
+                        statusStyle[req.status] || statusStyle.pending
+                      }`}
+                    >
+                      {statusLabel[req.status] || req.status}
+                    </span>
+
+                    <Link
+                      to={`/disabled/edit-request/${req.id}`}
+                      className='text-sm font-semibold text-teal-700 hover:text-teal-800 px-3 py-1.5 rounded-lg hover:bg-teal-50 transition-colors'
+                    >
+                      تعديل
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>

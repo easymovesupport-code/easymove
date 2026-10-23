@@ -33,6 +33,7 @@ const AppLayout = () => {
           <Route path='/admin/login' element={<AdminLogin />} />
           <Route path='/disabled/dashboard' element={<DisabledDashboard />} />
           <Route path='/disabled/request-help' element={<RequestHelp />} />
+          <Route path='/disabled/edit-request/:id' element={<RequestHelp />} />
         </Routes>
       </main>
 
