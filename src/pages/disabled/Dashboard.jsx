@@ -98,10 +98,20 @@ const DisabledDashboard = () => {
 
   const formatTime = (time) => {
     if (!time) return "—";
-    // time قد يأتي بصيغة HH:MM:SS
-    return time.slice(0, 5);
-  };
 
+    // time غالباً بصيغة HH:MM:SS أو HH:MM
+    const [hoursStr, minutesStr = "00"] = String(time).split(":");
+    let hours = Number(hoursStr);
+    const minutes = minutesStr.padStart(2, "0");
+
+    if (Number.isNaN(hours)) return "—";
+
+    const period = hours >= 12 ? "م" : "ص";
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+
+    return `${hours}:${minutes} ${period}`;
+  };
   const formatDate = (date) => {
     if (!date) return "—";
     return new Date(date).toLocaleDateString("ar-SA", {
