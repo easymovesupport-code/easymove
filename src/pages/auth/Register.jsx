@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import LocationPicker from "../../components/LocationPicker";
 import {
   ArrowLeft,
   IdCard,
@@ -8,7 +9,6 @@ import {
   Mail,
   Lock,
   Phone,
-  MapPin,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -43,9 +43,12 @@ const Register = () => {
     email: "",
     password: "",
     phone: "",
-    address: "",
-    gender: "", // male | female
+    gender: "",
   });
+
+  const [position, setPosition] = useState(null); // { lat, lng }
+  const [locationText, setLocationText] = useState("");
+
   const [skills, setSkills] = useState([]);
   const [availability, setAvailability] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
@@ -66,7 +69,7 @@ const Register = () => {
   };
 
   const validate = () => {
-    const { national_id, phone, password } = form;
+    const { national_id, phone, password, gender } = form;
 
     if (!/^[12]\d{9}$/.test(national_id)) {
       return "رقم الهوية يجب أن يكون 10 أرقام ويبدأ بـ 1 أو 2";
@@ -79,12 +82,17 @@ const Register = () => {
     if (password.length < 6) {
       return "كلمة المرور يجب ألا تقل عن 6 أحرف";
     }
-    if (!form.gender) {
+
+    if (!gender) {
       return "يرجى تحديد الجنس";
     }
+
+    if (!position || !position.lat || !position.lng) {
+      return "يرجى تحديد الموقع من الخريطة";
+    }
+
     return null;
   };
-
   const toggleSkill = (skill) => {
     setSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill],
@@ -128,9 +136,11 @@ const Register = () => {
           name: form.name,
           email: form.email,
           phone: form.phone,
-          address: form.address,
-          user_type: type,
           gender: form.gender,
+          user_type: type,
+          location_text: locationText || null,
+          latitude: position.lat,
+          longitude: position.lng,
         },
       ])
       .select()
@@ -197,14 +207,6 @@ const Register = () => {
       icon: Phone,
       ltr: false,
     },
-    {
-      name: "address",
-      label: "العنوان",
-      type: "text",
-      placeholder: "مثال: الرياض، حي النرجس",
-      icon: MapPin,
-      ltr: false,
-    },
   ];
 
   return (
@@ -269,6 +271,18 @@ const Register = () => {
                 </div>
               );
             })}
+            {/* العنوان من الخريطة */}
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                العنوان / الموقع <span className='text-red-500'>*</span>
+              </label>
+              <LocationPicker
+                position={position}
+                setPosition={setPosition}
+                locationText={locationText}
+                setLocationText={setLocationText}
+              />
+            </div>
             {/* اختيار الجنس */}
             <div>
               <label className='block text-sm font-medium text-slate-700 mb-2'>
