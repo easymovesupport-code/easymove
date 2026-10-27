@@ -10,6 +10,8 @@ import AdminLogin from "./pages/auth/AdminLogin";
 import DisabledDashboard from "./pages/disabled/Dashboard";
 import RequestHelp from "./pages/disabled/RequestHelp";
 import EditRequest from "./pages/disabled/EditRequest";
+import Doctors from "./pages/disabled/Doctors";
+
 
 // مكوّن داخلي عشان useLocation يشتغل صح
 const AppLayout = () => {
@@ -35,6 +37,7 @@ const AppLayout = () => {
           <Route path='/disabled/dashboard' element={<DisabledDashboard />} />
           <Route path='/disabled/request-help' element={<RequestHelp />} />
           <Route path='/disabled/edit-request/:id' element={<EditRequest />} />
+          <Route path='/disabled/doctors' element={<Doctors />} />;
         </Routes>
       </main>
 

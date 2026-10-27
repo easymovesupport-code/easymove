@@ -46,9 +46,8 @@ const Register = () => {
     gender: "",
   });
 
-  const [position, setPosition] = useState(null); // { lat, lng }
+  const [position, setPosition] = useState(null);
   const [locationText, setLocationText] = useState("");
-
   const [skills, setSkills] = useState([]);
   const [availability, setAvailability] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
@@ -59,7 +58,6 @@ const Register = () => {
     const { name, value } = e.target;
 
     if (name === "national_id" || name === "phone") {
-      // أرقام فقط
       const digits = value.replace(/\D/g, "").slice(0, 10);
       setForm({ ...form, [name]: digits });
       return;
@@ -93,6 +91,7 @@ const Register = () => {
 
     return null;
   };
+
   const toggleSkill = (skill) => {
     setSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill],
@@ -117,8 +116,11 @@ const Register = () => {
 
     setLoading(true);
 
+    // توحيد الإيميل
+    const email = form.email.trim().toLowerCase();
+
     const { error: authError } = await supabase.auth.signUp({
-      email: form.email,
+      email,
       password: form.password,
     });
 
@@ -134,7 +136,7 @@ const Register = () => {
         {
           national_id: form.national_id,
           name: form.name,
-          email: form.email,
+          email,
           phone: form.phone,
           gender: form.gender,
           user_type: type,
@@ -147,6 +149,7 @@ const Register = () => {
       .single();
 
     if (userError) {
+      console.error(userError);
       setLoading(false);
       setError("تعذر إنشاء الحساب. تحقق من رقم الهوية أو الإيميل.");
       return;
@@ -173,7 +176,6 @@ const Register = () => {
       type: "text",
       placeholder: "مثال: 1234567890",
       icon: IdCard,
-      ltr: false,
     },
     {
       name: "name",
@@ -181,7 +183,6 @@ const Register = () => {
       type: "text",
       placeholder: "مثال: محمد أحمد العتيبي",
       icon: User,
-      ltr: false,
     },
     {
       name: "email",
@@ -189,7 +190,6 @@ const Register = () => {
       type: "email",
       placeholder: "name@email.com",
       icon: Mail,
-      ltr: false,
     },
     {
       name: "password",
@@ -197,7 +197,6 @@ const Register = () => {
       type: showPassword ? "text" : "password",
       placeholder: "مثال: MyPass123",
       icon: Lock,
-      ltr: false,
     },
     {
       name: "phone",
@@ -205,7 +204,6 @@ const Register = () => {
       type: "tel",
       placeholder: "مثال: 05XXXXXXXX",
       icon: Phone,
-      ltr: false,
     },
   ];
 
@@ -252,7 +250,13 @@ const Register = () => {
                       className={`w-full pr-10 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all ${
                         field.name === "password" ? "pl-10" : "pl-4"
                       }`}
-                      dir={field.ltr ? "ltr" : "rtl"}
+                      dir={
+                        ["email", "password", "national_id", "phone"].includes(
+                          field.name,
+                        )
+                          ? "ltr"
+                          : "rtl"
+                      }
                     />
                     {field.name === "password" && (
                       <button
@@ -271,7 +275,8 @@ const Register = () => {
                 </div>
               );
             })}
-            {/* العنوان من الخريطة */}
+
+            {/* الموقع من الخريطة */}
             <div>
               <label className='block text-sm font-medium text-slate-700 mb-2'>
                 العنوان / الموقع <span className='text-red-500'>*</span>
@@ -283,7 +288,8 @@ const Register = () => {
                 setLocationText={setLocationText}
               />
             </div>
-            {/* اختيار الجنس */}
+
+            {/* الجنس */}
             <div>
               <label className='block text-sm font-medium text-slate-700 mb-2'>
                 الجنس
@@ -316,6 +322,7 @@ const Register = () => {
                 </button>
               </div>
             </div>
+
             {type === "volunteer" && (
               <>
                 <div>
