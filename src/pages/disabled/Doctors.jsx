@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, Circle } from "react-leaflet";
+import L from "leaflet";
 import { supabase } from "../../lib/supabase";
 import "../../utils/leafletIcon";
 import {
@@ -37,34 +38,87 @@ const getDistanceKm = (lat1, lon1, lat2, lon2) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+const detectRegion = (locationText = "") => {
+  const t = locationText.toLowerCase();
+
+  if (t.includes("riyadh") || t.includes("الرياض")) return "الرياض";
+  if (
+    t.includes("jeddah") ||
+    t.includes("جدة") ||
+    t.includes("makkah") ||
+    t.includes("مكة")
+  )
+    return "مكة المكرمة";
+  if (
+    t.includes("dammam") ||
+    t.includes("الدمام") ||
+    t.includes("khobar") ||
+    t.includes("الخبر") ||
+    t.includes("dhahran") ||
+    t.includes("الظهران") ||
+    t.includes("الشرقية")
+  )
+    return "الشرقية";
+  if (t.includes("madinah") || t.includes("المدينة")) return "المدينة المنورة";
+
+  return null;
+};
+
+// أيقونة موقع المستخدم
+const userIcon = L.divIcon({
+  className: "user-location-marker",
+  html: `
+    <div style="
+      width:42px;height:42px;border-radius:9999px;
+      background:#0f766e;border:3px solid white;
+      box-shadow:0 2px 10px rgba(0,0,0,.25);
+      display:flex;align-items:center;justify-content:center;
+      font-size:20px;line-height:1;
+    ">👤</div>
+  `,
+  iconSize: [42, 42],
+  iconAnchor: [21, 21],
+});
+
+// تجهيز النتائج: نفس المنطقة + الأقرب + أقصى 3
+const buildResults = (list, lat, lng, locationText) => {
+  const region = detectRegion(locationText || "");
+
+  let prepared = (list || []).map((f) => ({
+    ...f,
+    distance_km: getDistanceKm(
+      lat,
+      lng,
+      Number(f.latitude),
+      Number(f.longitude),
+    ),
+  }));
+
+  // فقط مرافق نفس منطقة المستخدم
+  if (region) {
+    prepared = prepared.filter((f) => f.region === region);
+  }
+
+  prepared.sort((a, b) => a.distance_km - b.distance_km);
+
+  // أقرب 3 فقط
+  return prepared.slice(0, 3);
+};
+
 const Doctors = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userLocation, setUserLocation] = useState(null);
+  const [allFacilities, setAllFacilities] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [filter, setFilter] = useState("all");
-
-  const applyDistance = (list, lat, lng) => {
-    return [...list]
-      .map((f) => ({
-        ...f,
-        distance_km: getDistanceKm(
-          lat,
-          lng,
-          Number(f.latitude),
-          Number(f.longitude),
-        ),
-      }))
-      .sort((a, b) => a.distance_km - b.distance_km);
-  };
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       setError("");
 
-      // 1) المستخدم من Auth
       const { data: authData, error: authError } =
         await supabase.auth.getUser();
       if (authError || !authData?.user) {
@@ -74,12 +128,9 @@ const Doctors = () => {
 
       const authEmail = authData.user.email;
 
-      // 2) جلب المستخدم بالإيميل فقط (بدون شرط user_type هنا)
       const { data: userRow, error: userError } = await supabase
         .from("users")
-        .select(
-          "id, email, user_type, latitude, longitude, location_text, address",
-        )
+        .select("id, email, user_type, latitude, longitude, location_text")
         .eq("email", authEmail)
         .maybeSingle();
 
@@ -88,7 +139,6 @@ const Doctors = () => {
         setError("تعذر قراءة بيانات الحساب");
       }
 
-      // 3) تحميل المرافق دائماً
       const { data: rows, error: facError } = await supabase
         .from("medical_facilities")
         .select("*")
@@ -97,12 +147,12 @@ const Doctors = () => {
       if (facError) {
         console.error("facilities error:", facError);
         setError("تعذر تحميل المرافق الطبية");
+        setAllFacilities([]);
         setFacilities([]);
       } else {
-        setFacilities(rows || []);
+        setAllFacilities(rows || []);
       }
 
-      // 4) تعيين الموقع إن وجد
       const lat = userRow?.latitude != null ? Number(userRow.latitude) : null;
       const lng = userRow?.longitude != null ? Number(userRow.longitude) : null;
 
@@ -112,19 +162,13 @@ const Doctors = () => {
         !Number.isNaN(lat) &&
         !Number.isNaN(lng)
       ) {
-        const loc = {
-          lat,
-          lng,
-          text:
-            userRow.location_text || userRow.address || "موقع الحساب المحفوظ",
-        };
-        setUserLocation(loc);
-        if (rows?.length) {
-          setFacilities(applyDistance(rows, lat, lng));
-        }
+        const text = userRow.location_text || "موقع الحساب المحفوظ";
+        setUserLocation({ lat, lng, text });
+        setFacilities(buildResults(rows || [], lat, lng, text));
         setError("");
       } else {
         setUserLocation(null);
+        setFacilities([]);
         setError(
           "لا يوجد موقع محفوظ لهذا الحساب. يمكنك استخدام الموقع الحالي أو موقع تجريبي في الرياض.",
         );
@@ -146,7 +190,7 @@ const Doctors = () => {
   const setLocationAndSort = (lat, lng, text) => {
     setUserLocation({ lat, lng, text });
     setError("");
-    setFacilities((prev) => applyDistance(prev, lat, lng));
+    setFacilities(buildResults(allFacilities, lat, lng, text));
   };
 
   const useCurrentLocation = () => {
@@ -215,7 +259,7 @@ const Doctors = () => {
               أقرب الأطباء والمرافق
             </h1>
             <p className='text-slate-500 text-sm'>
-              نتائج مرتبطة بالإعاقة الحركية حسب موقعك داخل السعودية
+              يتم عرض أقرب 3 مرافق داخل منطقتك فقط
             </p>
           </div>
 
@@ -279,26 +323,34 @@ const Doctors = () => {
         </div>
 
         <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+          {/* الخريطة */}
           <div className='h-[420px] rounded-3xl overflow-hidden border border-stone-200 shadow-sm bg-white'>
             {userLocation ? (
               <MapContainer
                 center={[userLocation.lat, userLocation.lng]}
-                zoom={11}
+                zoom={12}
                 style={{ height: "100%", width: "100%" }}
               >
                 <TileLayer
                   attribution='&copy; OpenStreetMap'
                   url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
                 />
-                <Marker position={[userLocation.lat, userLocation.lng]}>
+
+                {/* موقع المستخدم برمز مميز */}
+                <Marker
+                  position={[userLocation.lat, userLocation.lng]}
+                  icon={userIcon}
+                >
                   <Popup>موقعك</Popup>
                 </Marker>
+
                 <Circle
                   center={[userLocation.lat, userLocation.lng]}
                   radius={5000}
                   pathOptions={{ color: "#0f766e", fillOpacity: 0.05 }}
                 />
-                {filtered.slice(0, 20).map((f) => (
+
+                {filtered.map((f) => (
                   <Marker
                     key={f.id}
                     position={[Number(f.latitude), Number(f.longitude)]}
@@ -320,6 +372,7 @@ const Doctors = () => {
             )}
           </div>
 
+          {/* القائمة */}
           <div className='space-y-3 max-h-[420px] overflow-y-auto pe-1'>
             {!userLocation ? (
               <div className='bg-white border border-stone-200 rounded-2xl p-6 text-center text-slate-500 text-sm'>
@@ -327,20 +380,25 @@ const Doctors = () => {
               </div>
             ) : filtered.length === 0 ? (
               <div className='bg-white border border-stone-200 rounded-2xl p-6 text-center text-slate-500 text-sm'>
-                لا توجد نتائج ضمن هذا الفلتر حالياً.
+                لا توجد نتائج ضمن منطقتك أو هذا الفلتر حالياً.
               </div>
             ) : (
-              filtered.map((f) => (
+              filtered.map((f, index) => (
                 <div
                   key={f.id}
                   className='bg-white border border-stone-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow'
                 >
                   <div className='flex items-start justify-between gap-3'>
                     <div>
-                      <h3 className='font-bold text-slate-900'>
-                        {f.name_ar || f.name}
-                      </h3>
-                      <p className='text-sm text-slate-500 mt-1'>
+                      <div className='flex items-center gap-2 mb-1'>
+                        <span className='text-xs font-bold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full'>
+                          #{index + 1}
+                        </span>
+                        <h3 className='font-bold text-slate-900'>
+                          {f.name_ar || f.name}
+                        </h3>
+                      </div>
+                      <p className='text-sm text-slate-500'>
                         {TYPE_LABEL[f.facility_type] || f.facility_type}
                         {" • "}
                         {SPECIALTY_LABEL[f.specialty] || f.specialty || "—"}
