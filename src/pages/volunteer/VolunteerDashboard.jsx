@@ -143,37 +143,6 @@ const VolunteerDashboard = () => {
     };
   }, [suitableRequests, myRequests]);
 
-  const handleAccept = async (requestId) => {
-    if (!user) return;
-    setActionLoading(requestId);
-
-    const { error: updateError } = await supabase
-      .from("help_requests")
-      .update({
-        status: "accepted",
-        volunteer_id: user.id,
-      })
-      .eq("id", requestId)
-      .eq("status", "pending");
-
-    setActionLoading(null);
-
-    if (updateError) {
-      console.error(updateError);
-      setError("تعذر قبول الطلب. قد يكون قبله متطوع آخر.");
-      return;
-    }
-
-    const accepted = suitableRequests.find((r) => r.id === requestId);
-    setSuitableRequests((prev) => prev.filter((r) => r.id !== requestId));
-    if (accepted) {
-      setMyRequests((prev) => [
-        { ...accepted, status: "accepted", volunteer_id: user.id },
-        ...prev,
-      ]);
-    }
-  };
-
   const handleComplete = async (requestId) => {
     setActionLoading(requestId);
     const { error: updateError } = await supabase
@@ -338,31 +307,27 @@ const VolunteerDashboard = () => {
                     <p className='text-sm text-slate-500 mb-2'>
                       النوع: {req.help_type}
                     </p>
+
                     <div className='flex flex-wrap gap-2 text-xs'>
-                      <span className='inline-flex items-center gap-1 bg-white border border-stone-200 px-2.5 py-1 rounded-lg'>
+                      <span className='inline-flex items-center gap-1 bg-teal-50 text-teal-800 border border-teal-200 font-semibold px-2.5 py-1 rounded-lg'>
                         <CalendarDays size={12} />
-                        {getDayName(req.request_date)} •{" "}
+                        {getDayName(req.request_date)}
+                      </span>
+                      <span className='bg-cyan-50 text-cyan-800 border border-cyan-200 font-semibold px-2.5 py-1 rounded-lg'>
                         {formatDate(req.request_date)}
                       </span>
                       <span className='bg-white border border-stone-200 px-2.5 py-1 rounded-lg'>
                         الوقت: {formatTime(req.request_time)}
                       </span>
-                      {req.location && (
-                        <span className='bg-white border border-stone-200 px-2.5 py-1 rounded-lg'>
-                          {req.location}
-                        </span>
-                      )}
                     </div>
                   </div>
 
-                  <button
-                    type='button'
-                    disabled={actionLoading === req.id}
-                    onClick={() => handleAccept(req.id)}
-                    className='shrink-0 bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-teal-700/20 transition-all'
+                  <Link
+                    to={`/volunteer/request/${req.id}`}
+                    className='shrink-0 bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-teal-700/20 transition-all text-center'
                   >
-                    {actionLoading === req.id ? "جاري القبول..." : "قبول الطلب"}
-                  </button>
+                    عرض التفاصيل
+                  </Link>
                 </div>
               ))}
             </div>
@@ -403,23 +368,24 @@ const VolunteerDashboard = () => {
                     </span>
 
                     {req.status === "accepted" && (
-                      <>
+                      <div className='flex flex-wrap items-center gap-2'>
                         <Link
                           to={`/volunteer/chat/${req.id}`}
-                          className='inline-flex items-center gap-1.5 text-sm font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-2 rounded-xl transition-colors'
+                          className='inline-flex items-center gap-2 bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md shadow-teal-700/20 transition-all'
                         >
                           <MessageCircle size={16} />
                           محادثة
                         </Link>
+
                         <button
                           type='button'
                           disabled={actionLoading === req.id}
                           onClick={() => handleComplete(req.id)}
-                          className='text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-2 rounded-xl transition-colors'
+                          className='inline-flex items-center gap-2 bg-gradient-to-l from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md shadow-emerald-700/20 transition-all'
                         >
                           إكمال الطلب
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
