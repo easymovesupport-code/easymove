@@ -250,13 +250,7 @@ const Register = () => {
                       className={`w-full pr-10 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all ${
                         field.name === "password" ? "pl-10" : "pl-4"
                       }`}
-                      dir={
-                        ["email", "password", "national_id", "phone"].includes(
-                          field.name,
-                        )
-                          ? "ltr"
-                          : "rtl"
-                      }
+                      dir={"rtl"}
                     />
                     {field.name === "password" && (
                       <button
