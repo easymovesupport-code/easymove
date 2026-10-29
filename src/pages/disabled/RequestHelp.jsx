@@ -4,13 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { ArrowRight, HandHeart, CheckCircle2 } from "lucide-react";
 
-const HELP_TYPES = [
-  "مساعدة في التنقل",
-  "التسوق",
-  "موعد طبي",
-  "الدعم المنزلي",
-  "أخرى",
-];
+const HELP_TYPES = ["مساعدة في التنقل", "التسوق", "المواعيد الطبية"];
 
 const RequestHelp = () => {
   const navigate = useNavigate();

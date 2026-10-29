@@ -4,13 +4,7 @@ import { supabase } from "../../lib/supabase";
 import LocationPicker from "../../components/LocationPicker";
 import { ArrowRight, CheckCircle2, Pencil } from "lucide-react";
 
-const HELP_TYPES = [
-  "مساعدة في التنقل",
-  "التسوق",
-  "موعد طبي",
-  "الدعم المنزلي",
-  "أخرى",
-];
+const HELP_TYPES = ["مساعدة في التنقل", "التسوق", "المواعيد الطبية"];
 
 const EditRequest = () => {
   const { id } = useParams();
