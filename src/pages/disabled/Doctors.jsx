@@ -214,10 +214,6 @@ const Doctors = () => {
     );
   };
 
-  const useRiyadhTestLocation = () => {
-    setLocationAndSort(24.7136, 46.6753, "موقع تجريبي - الرياض");
-  };
-
   if (loading) {
     return (
       <div
@@ -271,14 +267,6 @@ const Doctors = () => {
             >
               <Navigation size={16} />
               استخدام موقعي الحالي
-            </button>
-
-            <button
-              type='button'
-              onClick={useRiyadhTestLocation}
-              className='inline-flex items-center gap-2 bg-white border border-stone-200 text-slate-700 hover:bg-stone-50 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors'
-            >
-              موقع تجريبي (الرياض)
             </button>
           </div>
         </div>
@@ -421,16 +409,28 @@ const Doctors = () => {
 
                   <div className='mt-3 flex flex-wrap gap-2'>
                     {f.phone && (
-                      <a
-                        href={`tel:${f.phone}`}
-                        className='inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg transition-colors'
-                      >
-                        <Phone size={14} />
-                        اتصال
-                      </a>
+                      <div className='inline-flex items-center gap-2'>
+                        <a
+                          href={`tel:${f.phone}`}
+                          className='inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg transition-colors'
+                        >
+                          <Phone size={14} />
+                          {f.phone}
+                        </a>
+                        <button
+                          type='button'
+                          onClick={() => {
+                            navigator.clipboard?.writeText(f.phone);
+                            alert("تم نسخ رقم الهاتف");
+                          }}
+                          className='text-xs text-slate-500 hover:text-teal-700 underline'
+                        >
+                          نسخ
+                        </button>
+                      </div>
                     )}
                     <a
-                      href={`https://www.openstreetmap.org/?mlat=${f.latitude}&mlon=${f.longitude}#map=16/${f.latitude}/${f.longitude}`}
+                      href={`https://www.google.com/maps?q=${f.latitude},${f.longitude}`}
                       target='_blank'
                       rel='noreferrer'
                       className='inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 bg-stone-50 hover:bg-stone-100 px-3 py-1.5 rounded-lg transition-colors'
