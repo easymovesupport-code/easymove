@@ -15,6 +15,7 @@ import VolunteerDashboard from "./pages/volunteer/VolunteerDashboard";
 import VolunteerProfile from "./pages/volunteer/VolunteerProfile";
 import VolunteerRequestDetails from "./pages/volunteer/VolunteerRequestDetails";
 import Chat from "./pages/volunteer/Chat";
+import DisabledChat from "./pages/disabled/Chat";
 
 // مكوّن داخلي عشان useLocation يشتغل صح
 const AppLayout = () => {
@@ -47,7 +48,8 @@ const AppLayout = () => {
             path='/volunteer/request/:id'
             element={<VolunteerRequestDetails />}
           />
-          <Route path='/volunteer/chat/:requestId' element={<Chat />} />; ;
+          <Route path='/volunteer/chat/:requestId' element={<Chat />} />
+          <Route path='/disabled/chat/:requestId' element={<DisabledChat />} />
         </Routes>
       </main>
 

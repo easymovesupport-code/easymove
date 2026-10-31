@@ -15,7 +15,7 @@ import {
 const DisabledDashboard = () => {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
-  const [, setUserId] = useState(null); // userId
+  const [, setUserId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -43,14 +43,12 @@ const DisabledDashboard = () => {
     const loadData = async () => {
       setLoading(true);
 
-      // 1) المستخدم الحالي من Auth
       const { data: authData } = await supabase.auth.getUser();
       if (!authData?.user) {
         navigate("/login?type=disabled");
         return;
       }
 
-      // 2) بيانات المستخدم من جدول users
       const { data: userRow } = await supabase
         .from("users")
         .select("id, name")
@@ -66,7 +64,6 @@ const DisabledDashboard = () => {
       setUserName(userRow.name || "مستخدم");
       setUserId(userRow.id);
 
-      // 3) الطلبات من help_requests
       const { data: requests } = await supabase
         .from("help_requests")
         .select("id, title, status, request_date, request_time, created_at")
@@ -98,20 +95,16 @@ const DisabledDashboard = () => {
 
   const formatTime = (time) => {
     if (!time) return "—";
-
-    // time غالباً بصيغة HH:MM:SS أو HH:MM
     const [hoursStr, minutesStr = "00"] = String(time).split(":");
     let hours = Number(hoursStr);
     const minutes = minutesStr.padStart(2, "0");
-
     if (Number.isNaN(hours)) return "—";
-
     const period = hours >= 12 ? "م" : "ص";
     hours = hours % 12;
     if (hours === 0) hours = 12;
-
     return `${hours}:${minutes} ${period}`;
   };
+
   const formatDate = (date) => {
     if (!date) return "—";
     return new Date(date).toLocaleDateString("ar-SA", {
@@ -119,6 +112,11 @@ const DisabledDashboard = () => {
       month: "long",
       day: "numeric",
     });
+  };
+
+  const formatDay = (date) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("ar-SA", { weekday: "long" });
   };
 
   const services = [
@@ -156,13 +154,8 @@ const DisabledDashboard = () => {
     );
   }
 
-  const formatDay = (date) => {
-    if (!date) return "—";
-    return new Date(date).toLocaleDateString("ar-SA", { weekday: "long" });
-  };
   return (
     <div className='min-h-screen bg-stone-50' dir='rtl'>
-      {/* Top Bar */}
       <header className='bg-white border-b border-stone-200 sticky top-0 z-40'>
         <div className='max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between'>
           <Link
@@ -173,7 +166,6 @@ const DisabledDashboard = () => {
           </Link>
 
           <div className='flex items-center gap-3'>
-            {/* إشعارات - حالياً شكلية */}
             <button
               type='button'
               title='الإشعارات قريباً'
@@ -182,7 +174,6 @@ const DisabledDashboard = () => {
               <Bell size={20} />
             </button>
 
-            {/* قائمة المستخدم */}
             <div className='relative'>
               <button
                 type='button'
@@ -215,7 +206,6 @@ const DisabledDashboard = () => {
       </header>
 
       <main className='max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8'>
-        {/* Welcome */}
         <section className='relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-700 via-teal-800 to-slate-900 text-white p-8 md:p-10 shadow-xl'>
           <div className='absolute -top-16 -left-16 w-56 h-56 bg-teal-400/20 rounded-full blur-3xl'></div>
           <div className='relative'>
@@ -230,7 +220,6 @@ const DisabledDashboard = () => {
           </div>
         </section>
 
-        {/* Stats */}
         <section className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
           {[
             {
@@ -271,7 +260,6 @@ const DisabledDashboard = () => {
           ))}
         </section>
 
-        {/* Services */}
         <section>
           <h2 className='text-xl font-bold text-slate-900 mb-4'>الخدمات</h2>
           <div className='grid grid-cols-1 md:grid-cols-3 gap-5'>
@@ -304,7 +292,6 @@ const DisabledDashboard = () => {
           </div>
         </section>
 
-        {/* Recent Requests */}
         <section className='bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden'>
           <div className='px-6 py-5 border-b border-stone-100 flex items-center justify-between'>
             <h2 className='text-lg font-bold text-slate-900'>آخر الطلبات</h2>
@@ -327,7 +314,6 @@ const DisabledDashboard = () => {
                   key={req.id}
                   className='px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-stone-50 transition-colors'
                 >
-                  {/* البيانات */}
                   <div className='min-w-0 flex-1'>
                     <p className='font-bold text-slate-900 text-base mb-3'>
                       {req.title}
@@ -336,7 +322,6 @@ const DisabledDashboard = () => {
                     <div className='flex flex-wrap gap-2'>
                       <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
                         <Clock size={14} className='text-teal-600' />
-                        {/* <span className='text-slate-500'>الوقت:</span> */}
                         <strong>{formatTime(req.request_time)}</strong>
                       </span>
 
@@ -344,7 +329,6 @@ const DisabledDashboard = () => {
                         <span className='text-teal-600 text-xs font-bold'>
                           يوم:
                         </span>
-                        {/* <span className='text-slate-500'>اليوم:</span> */}
                         <strong>{formatDay(req.request_date)}</strong>
                       </span>
 
@@ -352,14 +336,12 @@ const DisabledDashboard = () => {
                         <span className='text-teal-600 text-xs font-bold'>
                           تاريخ:
                         </span>
-                        {/* <span className='text-slate-500'>التاريخ:</span> */}
                         <strong>{formatDate(req.request_date)}</strong>
                       </span>
                     </div>
                   </div>
 
-                  {/* الحالة + التعديل */}
-                  <div className='flex items-center gap-3 shrink-0'>
+                  <div className='flex flex-wrap items-center gap-3 shrink-0'>
                     <span
                       className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
                         statusStyle[req.status] || statusStyle.pending
@@ -368,12 +350,26 @@ const DisabledDashboard = () => {
                       {statusLabel[req.status] || req.status}
                     </span>
 
-                    <Link
-                      to={`/disabled/edit-request/${req.id}`}
-                      className='inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all'
-                    >
-                      تعديل الطلب
-                    </Link>
+                    {/* تعديل فقط إذا الطلب ما زال pending */}
+                    {req.status === "pending" && (
+                      <Link
+                        to={`/disabled/edit-request/${req.id}`}
+                        className='inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all'
+                      >
+                        تعديل الطلب
+                      </Link>
+                    )}
+
+                    {/* محادثة بعد قبول المتطوع */}
+                    {req.status === "accepted" && (
+                      <Link
+                        to={`/disabled/chat/${req.id}`}
+                        className='inline-flex items-center justify-center gap-2 bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md shadow-teal-700/20 transition-all'
+                      >
+                        <MessageCircle size={16} />
+                        محادثة مع المتطوع
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}
