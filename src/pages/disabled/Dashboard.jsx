@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import doctorsImg from "../../assets/doctors.jpg";
+import volunteerImg from "../../assets/volunteer.jpg";
 import {
   Stethoscope,
   HandHeart,
@@ -10,13 +12,13 @@ import {
   ChevronLeft,
   Bell,
   LogOut,
+  UserRound,
 } from "lucide-react";
 
 const DisabledDashboard = () => {
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
-  const [, setUserId] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     activeRequests: 0,
@@ -24,6 +26,7 @@ const DisabledDashboard = () => {
     messages: 0,
   });
   const [recentRequests, setRecentRequests] = useState([]);
+  const [notifications, setNotifications] = useState([]);
 
   const statusStyle = {
     pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -62,17 +65,16 @@ const DisabledDashboard = () => {
       }
 
       setUserName(userRow.name || "مستخدم");
-      setUserId(userRow.id);
 
       const { data: requests } = await supabase
         .from("help_requests")
         .select("id, title, status, request_date, request_time, created_at")
         .eq("user_id", userRow.id)
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(10);
 
       const list = requests || [];
-      setRecentRequests(list);
+      setRecentRequests(list.slice(0, 5));
 
       setStats({
         activeRequests: list.filter((r) =>
@@ -81,6 +83,46 @@ const DisabledDashboard = () => {
         completedRequests: list.filter((r) => r.status === "completed").length,
         messages: list.filter((r) => r.status === "accepted").length,
       });
+
+      const notifs = [];
+
+      list
+        .filter((r) => r.status === "accepted")
+        .forEach((r) => {
+          notifs.push({
+            id: `accepted-${r.id}`,
+            type: "accepted",
+            title: "تم قبول طلبك",
+            body: `المتطوع قبل طلب: ${r.title}`,
+            time: r.created_at,
+            link: `/disabled/chat/${r.id}`,
+          });
+        });
+
+      const requestIds = list.map((r) => r.id);
+      if (requestIds.length > 0) {
+        const { data: msgs } = await supabase
+          .from("messages")
+          .select("id, request_id, sender_id, body, created_at")
+          .in("request_id", requestIds)
+          .neq("sender_id", userRow.id)
+          .order("created_at", { ascending: false })
+          .limit(8);
+
+        (msgs || []).forEach((m) => {
+          notifs.push({
+            id: `msg-${m.id}`,
+            type: "message",
+            title: "رسالة جديدة من المتطوع",
+            body: m.body?.slice(0, 60) || "رسالة جديدة",
+            time: m.created_at,
+            link: `/disabled/chat/${m.request_id}`,
+          });
+        });
+      }
+
+      notifs.sort((a, b) => new Date(b.time) - new Date(a.time));
+      setNotifications(notifs.slice(0, 10));
 
       setLoading(false);
     };
@@ -119,27 +161,30 @@ const DisabledDashboard = () => {
     return new Date(date).toLocaleDateString("ar-SA", { weekday: "long" });
   };
 
+  const formatNotifTime = (date) => {
+    if (!date) return "";
+    return new Date(date).toLocaleString("ar-SA", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const services = [
     {
       title: "أقرب الأطباء",
-      desc: "ابحث عن أطباء متخصصين في الإعاقة الحركية قرب موقعك",
+      desc: "ابحث عن أطباء ومراكز متخصصة في الإعاقة الحركية قرب موقعك",
       icon: <Stethoscope size={26} />,
       to: "/disabled/doctors",
-      iconBg: "bg-teal-50 text-teal-700",
+      image: doctorsImg,
     },
     {
       title: "طلب متطوع",
-      desc: "اطلب مساعدة فورية أو مجدولة من متطوع موثوق",
+      desc: "اطلب مساعدة من متطوع موثوق في التنقل أو التسوق أو المواعيد",
       icon: <HandHeart size={26} />,
       to: "/disabled/request-help",
-      iconBg: "bg-emerald-50 text-emerald-700",
-    },
-    {
-      title: "المحادثات",
-      desc: "تواصل مع المتطوع بعد قبول طلب المساعدة",
-      icon: <MessageCircle size={26} />,
-      to: "/disabled/messages",
-      iconBg: "bg-cyan-50 text-cyan-700",
+      image: volunteerImg,
     },
   ];
 
@@ -156,51 +201,93 @@ const DisabledDashboard = () => {
 
   return (
     <div className='min-h-screen bg-stone-50' dir='rtl'>
-      <header className='bg-white border-b border-stone-200 sticky top-0 z-40'>
+      <header className='bg-white/90 backdrop-blur border-b border-stone-200 sticky top-0 z-40'>
         <div className='max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between'>
-          <Link
-            to='/disabled/dashboard'
-            className='text-xl font-bold text-teal-800'
-          >
-            Easy<span className='text-teal-500'>Move</span>
-          </Link>
-
           <div className='flex items-center gap-3'>
-            <button
-              type='button'
-              title='الإشعارات قريباً'
-              className='relative p-2 rounded-xl hover:bg-stone-100 text-slate-600 transition-colors'
-            >
-              <Bell size={20} />
-            </button>
+            <div className='w-11 h-11 rounded-full bg-gradient-to-l from-teal-600 to-cyan-600 text-white flex items-center justify-center font-bold shadow-md shadow-teal-700/20'>
+              {(userName || "م").charAt(0)}
+            </div>
+            <div>
+              <p className='font-bold text-slate-900 text-sm'>{userName}</p>
+            </div>
+          </div>
 
+          <div className='flex items-center gap-2'>
             <div className='relative'>
               <button
                 type='button'
-                onClick={() => setMenuOpen((v) => !v)}
-                className='w-9 h-9 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-sm hover:bg-teal-200 transition-colors'
+                onClick={() => setNotifOpen((v) => !v)}
+                className='relative p-2 rounded-xl hover:bg-teal-50 text-slate-600 hover:text-teal-700 transition-colors'
+                title='التنبيهات'
               >
-                {userName?.charAt(0) || "م"}
+                <Bell size={20} />
+                {notifications.length > 0 && (
+                  <span className='absolute top-1.5 left-1.5 w-2 h-2 bg-red-500 rounded-full'></span>
+                )}
               </button>
 
-              {menuOpen && (
-                <div className='absolute left-0 mt-2 w-44 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden z-50'>
-                  <div className='px-4 py-3 border-b border-stone-100'>
-                    <p className='text-sm font-semibold text-slate-900 truncate'>
-                      {userName}
+              {notifOpen && (
+                <div className='absolute left-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-stone-200 rounded-2xl shadow-xl z-50'>
+                  <div className='px-4 py-3 border-b border-stone-100 flex items-center justify-between'>
+                    <p className='font-bold text-slate-900 text-sm'>
+                      التنبيهات
                     </p>
+                    <span className='text-xs text-slate-400'>
+                      {notifications.length}
+                    </span>
                   </div>
-                  <button
-                    type='button'
-                    onClick={handleLogout}
-                    className='w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors'
-                  >
-                    <LogOut size={16} />
-                    تسجيل الخروج
-                  </button>
+
+                  {notifications.length === 0 ? (
+                    <div className='px-4 py-8 text-center text-slate-400 text-sm'>
+                      لا توجد تنبيهات حالياً
+                    </div>
+                  ) : (
+                    <div className='divide-y divide-stone-100'>
+                      {notifications.map((n) => (
+                        <Link
+                          key={n.id}
+                          to={n.link}
+                          onClick={() => setNotifOpen(false)}
+                          className='block px-4 py-3 hover:bg-teal-50/50 transition-colors'
+                        >
+                          <p className='text-sm font-semibold text-slate-900 mb-0.5'>
+                            {n.title}
+                          </p>
+                          <p className='text-xs text-slate-500 line-clamp-2 mb-1'>
+                            {n.body}
+                          </p>
+                          <p className='text-[11px] text-slate-400'>
+                            {formatNotifTime(n.time)}
+                          </p>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+
+            <button
+              type='button'
+              onClick={() => navigate("/disabled/profile")}
+              className='p-2 rounded-xl hover:bg-teal-50 text-slate-600 hover:text-teal-700 transition-colors'
+              title='الملف الشخصي'
+            >
+              <UserRound size={20} />
+            </button>
+
+            <button
+              type='button'
+              onClick={handleLogout}
+              className='p-2 rounded-xl hover:bg-red-50 text-slate-600 hover:text-red-600 transition-colors'
+              title='تسجيل الخروج'
+            >
+              <LogOut size={20} />
+            </button>
+
+            <Link to='/' className='text-lg font-bold text-teal-800 ms-2'>
+              Easy<span className='text-teal-500'>Move</span>
+            </Link>
           </div>
         </div>
       </header>
@@ -262,30 +349,36 @@ const DisabledDashboard = () => {
 
         <section>
           <h2 className='text-xl font-bold text-slate-900 mb-4'>الخدمات</h2>
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-5'>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-5'>
             {services.map((service) => (
               <Link
                 key={service.title}
                 to={service.to}
-                className='group bg-white rounded-3xl border border-stone-200 p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300'
+                className='group relative overflow-hidden rounded-3xl min-h-[220px] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300'
               >
-                <div
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-5 ${service.iconBg}`}
-                >
-                  {service.icon}
-                </div>
-                <h3 className='text-lg font-bold text-slate-900 mb-2 group-hover:text-teal-700 transition-colors'>
-                  {service.title}
-                </h3>
-                <p className='text-slate-500 text-sm leading-relaxed mb-5'>
-                  {service.desc}
-                </p>
-                <div className='inline-flex items-center gap-1 text-teal-700 font-semibold text-sm'>
-                  ابدأ الآن
-                  <ChevronLeft
-                    size={16}
-                    className='group-hover:-translate-x-1 transition-transform'
-                  />
+                <img
+                  src={service.image}
+                  alt={service.title}
+                  className='absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500'
+                />
+                {/* <div className='absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/45 to-black/10'></div> */}
+                <div className='absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/65 to-slate-900/25'></div>
+
+                <div className='relative h-full p-6 flex flex-col justify-end text-white'>
+                  <div className='w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center mb-4'>
+                    {service.icon}
+                  </div>
+                  <h3 className='text-xl font-bold mb-2'>{service.title}</h3>
+                  <p className='text-white/90 text-sm leading-relaxed mb-4'>
+                    {service.desc}
+                  </p>
+                  <div className='inline-flex items-center gap-1 text-teal-200 font-semibold text-sm'>
+                    ابدأ الآن
+                    <ChevronLeft
+                      size={16}
+                      className='group-hover:-translate-x-1 transition-transform'
+                    />
+                  </div>
                 </div>
               </Link>
             ))}
@@ -293,14 +386,8 @@ const DisabledDashboard = () => {
         </section>
 
         <section className='bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden'>
-          <div className='px-6 py-5 border-b border-stone-100 flex items-center justify-between'>
+          <div className='px-6 py-5 border-b border-stone-100'>
             <h2 className='text-lg font-bold text-slate-900'>آخر الطلبات</h2>
-            <Link
-              to='/disabled/my-requests'
-              className='text-sm text-teal-700 font-semibold hover:underline'
-            >
-              عرض الكل
-            </Link>
           </div>
 
           {recentRequests.length === 0 ? (
@@ -318,20 +405,17 @@ const DisabledDashboard = () => {
                     <p className='font-bold text-slate-900 text-base mb-3'>
                       {req.title}
                     </p>
-
                     <div className='flex flex-wrap gap-2'>
                       <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
                         <Clock size={14} className='text-teal-600' />
                         <strong>{formatTime(req.request_time)}</strong>
                       </span>
-
                       <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
                         <span className='text-teal-600 text-xs font-bold'>
                           يوم:
                         </span>
                         <strong>{formatDay(req.request_date)}</strong>
                       </span>
-
                       <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
                         <span className='text-teal-600 text-xs font-bold'>
                           تاريخ:
@@ -350,7 +434,6 @@ const DisabledDashboard = () => {
                       {statusLabel[req.status] || req.status}
                     </span>
 
-                    {/* تعديل فقط إذا الطلب ما زال pending */}
                     {req.status === "pending" && (
                       <Link
                         to={`/disabled/edit-request/${req.id}`}
@@ -360,7 +443,6 @@ const DisabledDashboard = () => {
                       </Link>
                     )}
 
-                    {/* محادثة بعد قبول المتطوع */}
                     {req.status === "accepted" && (
                       <Link
                         to={`/disabled/chat/${req.id}`}
