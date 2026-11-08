@@ -8,13 +8,15 @@ import {
 } from "react-leaflet";
 import "../utils/leafletIcon";
 
-const RecenterMap = ({ lat, lng }) => {
+const RecenterMap = ({ lat, lng, zoom = 13 }) => {
   const map = useMap();
+
   useEffect(() => {
-    if (lat && lng) {
-      map.setView([lat, lng], 15);
+    if (lat != null && lng != null) {
+      map.setView([lat, lng], zoom);
     }
-  }, [lat, lng, map]);
+  }, [lat, lng, zoom, map]);
+
   return null;
 };
 
@@ -33,7 +35,7 @@ const LocationMarker = ({ position, setPosition, setLocationText }) => {
 const reverseGeocode = async (lat, lng, setLocationText) => {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=ar`,
       {
         headers: {
           Accept: "application/json",
@@ -54,11 +56,13 @@ const LocationPicker = ({
   setPosition,
   locationText,
   setLocationText,
+  mapCenter = null, // { lat, lng } من اختيار المدينة
 }) => {
   const [geoError, setGeoError] = useState("");
 
   const useCurrentLocation = () => {
     setGeoError("");
+
     if (!navigator.geolocation) {
       setGeoError("المتصفح لا يدعم تحديد الموقع");
       return;
@@ -68,19 +72,52 @@ const LocationPicker = ({
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
+        const accuracy = Math.round(pos.coords.accuracy); // بالمتر
+
         setPosition({ lat, lng });
         reverseGeocode(lat, lng, setLocationText);
+
+        // تنبيه إذا الدقة ضعيفة
+        if (accuracy > 500) {
+          setGeoError(
+            `تم تحديد موقع تقريبي (نطاق الخطأ حوالي ${accuracy} متر). للأدق: فعّلي GPS أو حددي من الخريطة يدوياً.`,
+          );
+        }
       },
-      () => {
-        setGeoError(
-          "تعذر الحصول على موقعك. فعّلي الإذن أو حددي الموقع من الخريطة.",
-        );
+      (err) => {
+        if (err.code === 1) {
+          setGeoError(
+            "تم رفض إذن الموقع. اسمحي للمتصفح بالوصول للموقع أو حددي من الخريطة.",
+          );
+        } else if (err.code === 2) {
+          setGeoError(
+            "تعذر تحديد موقعك حالياً. جرّبي مرة أخرى أو حددي من الخريطة.",
+          );
+        } else {
+          setGeoError(
+            "انتهت مهلة تحديد الموقع. تأكدي من تفعيل GPS ثم أعيدي المحاولة.",
+          );
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      {
+        enableHighAccuracy: true, // مهم جداً
+        timeout: 20000,
+        maximumAge: 0, // لا يستخدم موقعاً قديماً محفوظاً
+      },
     );
   };
 
-  const center = position ? [position.lat, position.lng] : [24.7136, 46.6753]; // الرياض افتراضياً
+  // أولوية المركز: موقع محدد → مدينة مختارة → الرياض
+  const center =
+    position?.lat != null && position?.lng != null
+      ? [position.lat, position.lng]
+      : mapCenter?.lat != null && mapCenter?.lng != null
+        ? [mapCenter.lat, mapCenter.lng]
+        : [24.7136, 46.6753];
+
+  // إحداثيات لإعادة التوسيط (مدينة أو موقع)
+  const recenterLat = position?.lat ?? mapCenter?.lat;
+  const recenterLng = position?.lng ?? mapCenter?.lng;
 
   return (
     <div className='space-y-3'>
@@ -100,14 +137,20 @@ const LocationPicker = ({
       <div className='h-72 rounded-2xl overflow-hidden border border-stone-200 shadow-sm'>
         <MapContainer
           center={center}
-          zoom={position ? 15 : 11}
+          zoom={position || mapCenter ? 13 : 11}
           style={{ height: "100%", width: "100%" }}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
           />
-          <RecenterMap lat={position?.lat} lng={position?.lng} />
+
+          <RecenterMap
+            lat={recenterLat}
+            lng={recenterLng}
+            zoom={position ? 16 : mapCenter ? 14 : 11}
+          />
+
           <LocationMarker
             position={position}
             setPosition={setPosition}
@@ -128,9 +171,9 @@ const LocationPicker = ({
           {geoError}
         </p>
       )}
-
       <p className='text-xs text-slate-400'>
-        اضغطي على الخريطة لتحديد الموقع، أو استخدمي زر الموقع الحالي.
+        اختاري المدينة للانتقال السريع، ثم اضغطي على موقعك الدقيق داخل الخريطة.
+        زر «موقعي الحالي» أدق على الجوال مع تفعيل GPS.
       </p>
     </div>
   );

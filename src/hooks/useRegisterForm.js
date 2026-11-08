@@ -15,6 +15,7 @@ const initialForm = {
   marital_status: "",
   education: "",
   phone: "",
+  city: "",
 };
 
 export const useRegisterForm = (type) => {
@@ -208,6 +209,7 @@ export const useRegisterForm = (type) => {
             latitude: position.lat,
             longitude: position.lng,
             location_text: locationText || null,
+            city: form.city || null,
           },
         ])
         .select("id")
