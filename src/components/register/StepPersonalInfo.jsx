@@ -11,8 +11,8 @@ const StepPersonalInfo = ({
   onProfileChange,
 }) => {
   return (
-    <>
-      <div>
+    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+      <div className='md:col-span-2'>
         <label className='block text-sm font-medium text-slate-700 mb-2'>
           صورة شخصية
         </label>
@@ -66,7 +66,7 @@ const StepPersonalInfo = ({
         </div>
       </div>
 
-      <div>
+      <div className='md:col-span-2'>
         <label className='block text-sm font-medium text-slate-700 mb-2'>
           المؤهل العلمي
         </label>
@@ -89,7 +89,7 @@ const StepPersonalInfo = ({
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

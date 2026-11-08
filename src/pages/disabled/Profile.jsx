@@ -15,6 +15,8 @@ const Profile = () => {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [nationality, setNationality] = useState("");
   const [position, setPosition] = useState(null);
   const [locationText, setLocationText] = useState("");
 
@@ -29,7 +31,7 @@ const Profile = () => {
       const { data: userRow, error: userError } = await supabase
         .from("users")
         .select(
-          "id, name, phone, gender, latitude, longitude, location_text, user_type",
+          "id, name, phone, gender, date_of_birth, nationality, latitude, longitude, location_text, user_type",
         )
         .eq("email", authData.user.email)
         .eq("user_type", "disabled")
@@ -45,6 +47,8 @@ const Profile = () => {
       setName(userRow.name || "");
       setPhone(userRow.phone || "");
       setGender(userRow.gender || "");
+      setDateOfBirth(userRow.date_of_birth || "");
+      setNationality(userRow.nationality || "");
       setLocationText(userRow.location_text || "");
 
       if (userRow.latitude != null && userRow.longitude != null) {
@@ -78,18 +82,18 @@ const Profile = () => {
       return;
     }
 
-    const payload = {
-      name: name.trim(),
-      phone: phone || null,
-      gender: gender || null,
-      location_text: locationText || null,
-      latitude: position?.lat ?? null,
-      longitude: position?.lng ?? null,
-    };
-
     const { error: updateError } = await supabase
       .from("users")
-      .update(payload)
+      .update({
+        name: name.trim(),
+        phone: phone || null,
+        gender: gender || null,
+        date_of_birth: dateOfBirth || null,
+        nationality: nationality || null,
+        location_text: locationText || null,
+        latitude: position?.lat ?? null,
+        longitude: position?.lng ?? null,
+      })
       .eq("id", userId);
 
     setSaving(false);
@@ -136,6 +140,9 @@ const Profile = () => {
 
       <main className='max-w-3xl mx-auto px-4 sm:px-6 py-8'>
         <div className='mb-8'>
+          <div className='inline-flex items-center gap-2 bg-teal-100 text-teal-800 text-xs font-semibold px-3 py-1 rounded-full mb-3'>
+            حساب ذوي الإعاقة
+          </div>
           <h1 className='text-3xl font-bold text-slate-900'>الملف الشخصي</h1>
           <p className='text-slate-500 text-sm mt-1'>
             حدّث بياناتك وموقعك لتحسين نتائج الأطباء والطلبات
@@ -146,59 +153,84 @@ const Profile = () => {
           onSubmit={handleSave}
           className='bg-white/90 backdrop-blur border border-teal-100 shadow-xl shadow-teal-700/5 rounded-3xl p-6 md:p-8 space-y-6'
         >
-          <div>
-            <label className='block text-sm font-medium text-slate-700 mb-2'>
-              الاسم
-            </label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className='w-full px-4 py-3 rounded-xl border border-stone-200 bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none'
-              required
-            />
-          </div>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                الاسم
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className='w-full px-4 py-3 rounded-xl border border-stone-200 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+                required
+              />
+            </div>
 
-          <div>
-            <label className='block text-sm font-medium text-slate-700 mb-2'>
-              رقم الجوال
-            </label>
-            <input
-              value={phone}
-              onChange={(e) =>
-                setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
-              }
-              className='w-full px-4 py-3 rounded-xl border border-stone-200 bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none'
-              dir='ltr'
-            />
-          </div>
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                رقم الجوال
+              </label>
+              <input
+                value={phone}
+                onChange={(e) =>
+                  setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+                }
+                className='w-full px-4 py-3 rounded-xl border border-stone-200 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+                dir='ltr'
+              />
+            </div>
 
-          <div>
-            <label className='block text-sm font-medium text-slate-700 mb-2'>
-              الجنس
-            </label>
-            <div className='grid grid-cols-2 gap-3'>
-              <button
-                type='button'
-                onClick={() => setGender("male")}
-                className={`py-3 rounded-xl border-2 font-medium transition-all ${
-                  gender === "male"
-                    ? "border-teal-600 bg-teal-50 text-teal-800"
-                    : "border-stone-200 bg-white text-slate-600"
-                }`}
-              >
-                ذكر
-              </button>
-              <button
-                type='button'
-                onClick={() => setGender("female")}
-                className={`py-3 rounded-xl border-2 font-medium transition-all ${
-                  gender === "female"
-                    ? "border-teal-600 bg-teal-50 text-teal-800"
-                    : "border-stone-200 bg-white text-slate-600"
-                }`}
-              >
-                أنثى
-              </button>
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                تاريخ الميلاد
+              </label>
+              <input
+                type='date'
+                value={dateOfBirth || ""}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                className='w-full px-4 py-3 rounded-xl border border-stone-200 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+              />
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                الجنسية
+              </label>
+              <input
+                value={nationality}
+                onChange={(e) => setNationality(e.target.value)}
+                className='w-full px-4 py-3 rounded-xl border border-stone-200 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
+              />
+            </div>
+
+            <div className='md:col-span-2'>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                الجنس
+              </label>
+              <div className='grid grid-cols-2 gap-3'>
+                <button
+                  type='button'
+                  onClick={() => setGender("male")}
+                  className={`py-3 rounded-xl border-2 font-medium ${
+                    gender === "male"
+                      ? "border-teal-600 bg-teal-50 text-teal-800"
+                      : "border-stone-200 text-slate-600"
+                  }`}
+                >
+                  ذكر
+                </button>
+                <button
+                  type='button'
+                  onClick={() => setGender("female")}
+                  className={`py-3 rounded-xl border-2 font-medium ${
+                    gender === "female"
+                      ? "border-teal-600 bg-teal-50 text-teal-800"
+                      : "border-stone-200 text-slate-600"
+                  }`}
+                >
+                  أنثى
+                </button>
+              </div>
             </div>
           </div>
 

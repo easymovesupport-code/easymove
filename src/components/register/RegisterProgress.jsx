@@ -1,11 +1,16 @@
-const steps = ["البيانات الأساسية", "البيانات الشخصية", "التواصل والتطوع"];
-// مكون عرض تقدم التسجيل
-const RegisterProgress = ({ step }) => {
+const RegisterProgress = ({ step, totalSteps = 3, labels = [] }) => {
+  const defaultLabels =
+    totalSteps === 3
+      ? ["البيانات الأساسية", "البيانات الشخصية", "التواصل و المهارات "]
+      : ["البيانات الأساسية", "التواصل والموقع"];
+
+  const steps = labels.length ? labels : defaultLabels;
+
   return (
     <div className='mb-8'>
       <p className='text-sm text-slate-500 mb-3 text-center'>
-        ستمر بـ <strong className='text-teal-700'>3 خطوات</strong> لإنشاء الحساب
-        بسهولة
+        ستمر بـ <strong className='text-teal-700'>{totalSteps} خطوات</strong>{" "}
+        لإنشاء الحساب بسهولة
       </p>
 
       <div className='flex items-center justify-between gap-2'>
@@ -32,11 +37,11 @@ const RegisterProgress = ({ step }) => {
           );
         })}
       </div>
-      {/* Progress Bar */}
+
       <div className='mt-3 h-1.5 bg-stone-100 rounded-full overflow-hidden'>
         <div
           className='h-full bg-gradient-to-l from-teal-600 to-cyan-500 transition-all'
-          style={{ width: `${(step / 3) * 100}%` }}
+          style={{ width: `${(step / totalSteps) * 100}%` }}
         />
       </div>
     </div>

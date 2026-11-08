@@ -133,13 +133,16 @@ export const useRegisterForm = (type) => {
     }
     return true;
   };
+
+  const totalSteps = isVolunteer ? 3 : 2;
   // انتقال للخطوة التالية
   const nextStep = () => {
     setError("");
     if (step === 1 && !validateStep1()) return;
-    if (step === 2 && !validateStep2()) return;
-    setStep((s) => Math.min(3, s + 1));
+    if (isVolunteer && step === 2 && !validateStep2()) return;
+    setStep((s) => Math.min(totalSteps, s + 1));
   };
+
   // رجع للخطوة السابقة
   const prevStep = () => {
     setError("");
@@ -166,12 +169,12 @@ export const useRegisterForm = (type) => {
     setError("");
     // تحقق من صحة البيانات
     if (isVolunteer) {
+      if (step !== 3) return;
       if (!validateStep3()) return;
     } else {
-      if (!validateStep1()) return;
-      if (!validateStep3()) return;
+      if (step !== 2) return;
+      if (!validateStep3()) return; // هاتف + موقع
     }
-
     setLoading(true);
     const email = form.email.trim().toLowerCase();
 
@@ -257,5 +260,6 @@ export const useRegisterForm = (type) => {
     nextStep,
     prevStep,
     handleRegister,
+    totalSteps,
   };
 };

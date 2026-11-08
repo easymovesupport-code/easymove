@@ -10,7 +10,7 @@ const StepBasicInfo = ({
   setShowConfirm,
 }) => {
   return (
-    <>
+    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
       <div>
         <label className='block text-sm font-medium text-slate-700 mb-2'>
           رقم الهوية الوطنية
@@ -99,7 +99,32 @@ const StepBasicInfo = ({
           />
         </div>
       </div>
-
+      <div>
+        <label className='block text-sm font-medium text-slate-700 mb-2'>
+          الجنس
+        </label>
+        <div className='grid grid-cols-2 gap-3'>
+          {[
+            { id: "male", label: "ذكر" },
+            { id: "female", label: "أنثى" },
+          ].map((g) => (
+            <button
+              key={g.id}
+              type='button'
+              onClick={() =>
+                handleChange({ target: { name: "gender", value: g.id } })
+              }
+              className={`py-3 rounded-xl border-2 font-medium ${
+                form.gender === g.id
+                  ? "border-teal-600 bg-teal-50 text-teal-800"
+                  : "border-stone-200 text-slate-600"
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div>
         <label className='block text-sm font-medium text-slate-700 mb-2'>
           كلمة المرور
@@ -153,34 +178,7 @@ const StepBasicInfo = ({
           </button>
         </div>
       </div>
-
-      <div>
-        <label className='block text-sm font-medium text-slate-700 mb-2'>
-          الجنس
-        </label>
-        <div className='grid grid-cols-2 gap-3'>
-          {[
-            { id: "male", label: "ذكر" },
-            { id: "female", label: "أنثى" },
-          ].map((g) => (
-            <button
-              key={g.id}
-              type='button'
-              onClick={() =>
-                handleChange({ target: { name: "gender", value: g.id } })
-              }
-              className={`py-3 rounded-xl border-2 font-medium ${
-                form.gender === g.id
-                  ? "border-teal-600 bg-teal-50 text-teal-800"
-                  : "border-stone-200 text-slate-600"
-              }`}
-            >
-              {g.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
+    </div>
   );
 };
 
