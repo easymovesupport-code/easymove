@@ -12,12 +12,13 @@ import RequestHelp from "./pages/disabled/RequestHelp";
 import EditRequest from "./pages/disabled/EditRequest";
 import Doctors from "./pages/disabled/Doctors";
 import VolunteerDashboard from "./pages/volunteer/VolunteerDashboard";
-import VolunteerProfile from "./pages/volunteer/VolunteerProfile";
 import VolunteerRequestDetails from "./pages/volunteer/VolunteerRequestDetails";
 import Chat from "./pages/volunteer/Chat";
 import DisabledChat from "./pages/disabled/Chat";
-import DisabledProfile from "./pages/disabled/Profile";
-
+import DisabledProfileView from "./pages/disabled/ProfileView";
+import DisabledProfileEdit from "./pages/disabled/Profile"; // الصفحة الحالية للتعديل
+import VolunteerProfileView from "./pages/volunteer/ProfileView";
+import VolunteerProfileEdit from "./pages/volunteer/VolunteerProfile";
 
 // مكوّن داخلي عشان useLocation يشتغل صح
 const AppLayout = () => {
@@ -45,14 +46,22 @@ const AppLayout = () => {
           <Route path='/disabled/edit-request/:id' element={<EditRequest />} />
           <Route path='/disabled/doctors' element={<Doctors />} />
           <Route path='/volunteer/dashboard' element={<VolunteerDashboard />} />
-          <Route path='/volunteer/profile' element={<VolunteerProfile />} />
           <Route
             path='/volunteer/request/:id'
             element={<VolunteerRequestDetails />}
           />
           <Route path='/volunteer/chat/:requestId' element={<Chat />} />
           <Route path='/disabled/chat/:requestId' element={<DisabledChat />} />
-          <Route path='/disabled/profile' element={<DisabledProfile />} />;
+          <Route path='/disabled/profile' element={<DisabledProfileView />} />
+          <Route
+            path='/disabled/profile/edit'
+            element={<DisabledProfileEdit />}
+          />
+          <Route path='/volunteer/profile' element={<VolunteerProfileView />} />
+          <Route
+            path='/volunteer/profile/edit'
+            element={<VolunteerProfileEdit />}
+          />
         </Routes>
       </main>
 
