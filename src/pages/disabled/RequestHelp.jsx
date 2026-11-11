@@ -1,31 +1,33 @@
-import LocationPicker from "../../components/LocationPicker";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import { ArrowRight, HandHeart, CheckCircle2 } from "lucide-react";
+import LocationPicker from "../../components/LocationPicker";
+import { ArrowRight, Search, HandHeart } from "lucide-react";
 
 const HELP_TYPES = ["مساعدة في التنقل", "التسوق", "المواعيد الطبية"];
 
 const RequestHelp = () => {
   const navigate = useNavigate();
   const [userId, setUserId] = useState(null);
-  const [loadingUser, setLoadingUser] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [position, setPosition] = useState(null); // { lat, lng }
-  const [locationText, setLocationText] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const [form, setForm] = useState({
-    help_type: "",
-    title: "",
-    request_time: "",
-    request_date: "",
-    description: "",
-  });
+  const [helpType, setHelpType] = useState("");
+  const [title, setTitle] = useState("");
+  const [timeFrom, setTimeFrom] = useState("");
+  const [timeTo, setTimeTo] = useState("");
+  const [requestDate, setRequestDate] = useState("");
+  const [description, setDescription] = useState("");
+
+  const [position, setPosition] = useState(null);
+  const [locationText, setLocationText] = useState("");
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    const loadUser = async () => {
+    const load = async () => {
       const { data: authData } = await supabase.auth.getUser();
       if (!authData?.user) {
         navigate("/login?type=disabled");
@@ -34,10 +36,10 @@ const RequestHelp = () => {
 
       const { data: userRow } = await supabase
         .from("users")
-        .select("id")
+        .select("id, latitude, longitude, location_text, city")
         .eq("email", authData.user.email)
         .eq("user_type", "disabled")
-        .single();
+        .maybeSingle();
 
       if (!userRow) {
         navigate("/login?type=disabled");
@@ -45,71 +47,124 @@ const RequestHelp = () => {
       }
 
       setUserId(userRow.id);
-      setLoadingUser(false);
+
+      if (userRow.latitude != null && userRow.longitude != null) {
+        setPosition({
+          lat: Number(userRow.latitude),
+          lng: Number(userRow.longitude),
+        });
+        setLocationText(userRow.location_text || userRow.city || "");
+      }
+
+      setLoading(false);
     };
 
-    loadUser();
+    load();
   }, [navigate]);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+  const searchPlace = async () => {
+    if (!placeQuery.trim()) {
+      setError("اكتبي اسم المكان للبحث");
+      return;
+    }
+
+    setSearching(true);
+    setError("");
+
+    try {
+      const q = encodeURIComponent(`${placeQuery} السعودية`);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1&accept-language=ar`,
+        { headers: { Accept: "application/json" } },
+      );
+      const data = await res.json();
+
+      if (!data?.length) {
+        setError("لم يتم العثور على المكان. جرّبي اسم أوضح.");
+        setSearching(false);
+        return;
+      }
+
+      const lat = Number(data[0].lat);
+      const lng = Number(data[0].lon);
+      setPosition({ lat, lng });
+      setLocationText(data[0].display_name || placeQuery);
+    } catch {
+      setError("تعذر البحث عن المكان حالياً");
+    } finally {
+      setSearching(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setSubmitting(true);
+    setSuccess("");
 
-    if (
-      !form.help_type ||
-      !form.title ||
-      !form.request_time ||
-      !form.request_date ||
-      !position
-    ) {
-      setError("يرجى تعبئة جميع الحقول المطلوبة وتحديد الموقع");
-      setSubmitting(false);
+    if (!helpType) {
+      setError("اختاري نوع المساعدة");
+      return;
+    }
+    if (!title.trim()) {
+      setError("عنوان الطلب مطلوب");
+      return;
+    }
+    if (!timeFrom || !timeTo) {
+      setError("حددي وقت بداية ونهاية الخدمة");
+      return;
+    }
+    if (timeFrom >= timeTo) {
+      setError("وقت النهاية يجب أن يكون بعد وقت البداية");
+      return;
+    }
+    if (!requestDate) {
+      setError("التاريخ مطلوب");
+      return;
+    }
+    if (!description.trim()) {
+      setError("التفاصيل الإضافية مطلوبة");
+      return;
+    }
+    if (!position?.lat || !position?.lng) {
+      setError("حددي الموقع على الخريطة");
       return;
     }
 
-    const payload = {
-      user_id: userId,
-      title: form.title,
-      help_type: form.help_type,
-      description: form.description || null,
-      location: locationText || `${position.lat}, ${position.lng}`,
-      latitude: position.lat,
-      longitude: position.lng,
-      request_date: form.request_date,
-      request_time: form.request_time,
-      status: "pending",
-    };
-    const { error: insertError } = await supabase
-      .from("help_requests")
-      .insert([payload]);
+    setSaving(true);
 
-    setSubmitting(false);
+    const { error: insertError } = await supabase.from("help_requests").insert([
+      {
+        user_id: userId,
+        title: title.trim(),
+        help_type: helpType,
+        description: description.trim(),
+        location: locationText || null,
+        latitude: position.lat,
+        longitude: position.lng,
+        request_date: requestDate,
+        request_time: timeFrom, // للتوافق مع الكود القديم
+        time_from: timeFrom,
+        time_to: timeTo,
+        status: "pending",
+      },
+    ]);
+
+    setSaving(false);
 
     if (insertError) {
       console.error(insertError);
-      setError("تعذر إرسال الطلب. حاولي مرة أخرى.");
+      setError("تعذر إرسال الطلب. تحققي من الأعمدة في قاعدة البيانات.");
       return;
     }
 
-    setSuccess(true);
-    setTimeout(() => {
-      navigate("/disabled/dashboard");
-    }, 1800);
+    setSuccess("تم إرسال الطلب بنجاح");
+    setTimeout(() => navigate("/disabled/dashboard"), 1200);
   };
 
-  if (loadingUser) {
+  if (loading) {
     return (
       <div
-        className='min-h-screen bg-stone-50 flex items-center justify-center'
+        className='min-h-screen flex items-center justify-center bg-stone-50'
         dir='rtl'
       >
         <p className='text-slate-500'>جاري التحميل...</p>
@@ -117,32 +172,13 @@ const RequestHelp = () => {
     );
   }
 
-  if (success) {
-    return (
-      <div
-        className='min-h-screen bg-stone-50 flex items-center justify-center px-4'
-        dir='rtl'
-      >
-        <div className='bg-white rounded-3xl border border-stone-200 shadow-lg p-10 text-center max-w-md w-full'>
-          <div className='w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4'>
-            <CheckCircle2 size={32} />
-          </div>
-          <h2 className='text-2xl font-bold text-slate-900 mb-2'>
-            تم إرسال طلبك
-          </h2>
-          <p className='text-slate-500 text-sm'>
-            سيتم تحويلك إلى لوحة التحكم لمتابعة حالة الطلب.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const inputClass =
+    "w-full px-4 py-3 rounded-xl border border-stone-200 bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none text-right";
 
   return (
     <div className='min-h-screen bg-stone-50' dir='rtl'>
-      {/* Top bar */}
       <header className='bg-white border-b border-stone-200 sticky top-0 z-40'>
-        <div className='max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between'>
+        <div className='max-w-4xl mx-auto px-4 py-4 flex items-center justify-between'>
           <Link
             to='/disabled/dashboard'
             className='inline-flex items-center gap-2 text-slate-600 hover:text-teal-700 text-sm font-medium'
@@ -150,51 +186,46 @@ const RequestHelp = () => {
             <ArrowRight size={18} />
             العودة للوحة التحكم
           </Link>
-          <Link
-            to='/disabled/dashboard'
-            className='text-xl font-bold text-teal-800'
-          >
+          <span className='font-bold text-teal-800'>
             Easy<span className='text-teal-500'>Move</span>
-          </Link>
+          </span>
         </div>
       </header>
 
-      <main className='max-w-3xl mx-auto px-4 sm:px-6 py-8'>
-        <div className='mb-8'>
-          <div className='w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-4'>
-            <HandHeart size={28} />
+      <main className='max-w-4xl mx-auto px-4 py-8'>
+        <div className='flex items-start justify-between gap-4 mb-8'>
+          <div>
+            <h1 className='text-3xl font-bold text-slate-900 mb-2'>
+              طلب مساعدة
+            </h1>
+            <p className='text-slate-500 text-sm'>
+              املأي البيانات التالية وسيظهر طلبك للمتطوعين المتاحين.
+            </p>
           </div>
-          <h1 className='text-3xl font-bold text-slate-900 mb-2'>طلب مساعدة</h1>
-          <p className='text-slate-500'>
-            املأ البيانات التالية وسيظهر طلبك للمتطوعين المتاحين.
-          </p>
+          <div className='w-12 h-12 rounded-2xl bg-teal-50 text-teal-700 flex items-center justify-center'>
+            <HandHeart size={22} />
+          </div>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className='bg-white rounded-3xl border border-stone-200 shadow-sm p-6 md:p-8 space-y-5'
+          className='bg-white rounded-3xl border border-stone-200 shadow-sm p-6 md:p-8 space-y-6'
         >
-          {/* 1) نوع المساعدة */}
+          {/* نوع المساعدة */}
           <div>
-            <label className='block text-sm font-medium text-slate-700 mb-2'>
+            <label className='block text-sm font-medium text-slate-700 mb-2 text-right'>
               نوع المساعدة <span className='text-red-500'>*</span>
             </label>
-            <div className='flex flex-wrap gap-2'>
+            <div className='flex flex-wrap gap-2 justify-end'>
               {HELP_TYPES.map((type) => (
                 <button
                   key={type}
                   type='button'
-                  onClick={() =>
-                    setForm((p) => ({
-                      ...p,
-                      help_type: type,
-                      title: p.title || type,
-                    }))
-                  }
+                  onClick={() => setHelpType(type)}
                   className={`px-4 py-2 rounded-full text-sm border transition-all ${
-                    form.help_type === type
-                      ? "bg-teal-700 text-white border-teal-700"
-                      : "bg-stone-50 text-slate-600 border-stone-200 hover:border-teal-300"
+                    helpType === type
+                      ? "bg-teal-600 text-white border-teal-600"
+                      : "bg-white text-slate-600 border-stone-200 hover:border-teal-300"
                   }`}
                 >
                   {type}
@@ -203,73 +234,110 @@ const RequestHelp = () => {
             </div>
           </div>
 
-          {/* 2) عنوان الطلب */}
-          <div>
-            <label className='block text-sm font-medium text-slate-700 mb-2'>
-              عنوان الطلب <span className='text-red-500'>*</span>
-            </label>
-            <input
-              type='text'
-              name='title'
-              value={form.title}
-              onChange={handleChange}
-              required
-              placeholder='مثال: مرافقة لموعد علاج طبيعي'
-              className='w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all'
-            />
-          </div>
+          {/* شبكة عمودين */}
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className='md:col-span-2'>
+              <label className='block text-sm font-medium text-slate-700 mb-2 text-right'>
+                عنوان الطلب <span className='text-red-500'>*</span>
+              </label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className={inputClass}
+                placeholder='مثال: مرافقة لموعد علاج طبيعي'
+              />
+            </div>
 
-          {/* 3) الوقت */}
-          <div>
-            <label className='block text-sm font-medium text-slate-700 mb-2'>
-              الوقت <span className='text-red-500'>*</span>
-            </label>
-            <input
-              type='time'
-              name='request_time'
-              value={form.request_time}
-              onChange={handleChange}
-              required
-              className='w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all'
-            />
-          </div>
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2 text-right'>
+                من الساعة <span className='text-red-500'>*</span>
+              </label>
+              <input
+                type='time'
+                value={timeFrom}
+                onChange={(e) => setTimeFrom(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </div>
 
-          {/* 4) التاريخ */}
-          <div>
-            <label className='block text-sm font-medium text-slate-700 mb-2'>
-              التاريخ <span className='text-red-500'>*</span>
-            </label>
-            <input
-              type='date'
-              name='request_date'
-              value={form.request_date}
-              onChange={handleChange}
-              required
-              className='w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all'
-            />
-          </div>
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2 text-right'>
+                إلى الساعة <span className='text-red-500'>*</span>
+              </label>
+              <input
+                type='time'
+                value={timeTo}
+                onChange={(e) => setTimeTo(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </div>
 
-          {/* 5) الموقع */}
-          <LocationPicker
-            position={position}
-            setPosition={setPosition}
-            locationText={locationText}
-            setLocationText={setLocationText}
-          />
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2 text-right'>
+                التاريخ <span className='text-red-500'>*</span>
+              </label>
+              <input
+                type='date'
+                value={requestDate}
+                onChange={(e) => setRequestDate(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </div>
 
-          {/* 6) تفاصيل إضافية */}
-          <div>
-            <label className='block text-sm font-medium text-slate-700 mb-2'>
-              تفاصيل إضافية
-            </label>
-            <textarea
-              name='description'
-              value={form.description}
-              onChange={handleChange}
-              rows={4}
-              placeholder='اكتبي أي تفاصيل تساعد المتطوع على فهم الطلب...'
-              className='w-full px-4 py-3.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 outline-none transition-all resize-none'
-            />
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2 text-right'>
+                بحث عن المكان
+              </label>
+              <div className='flex gap-2'>
+                <input
+                  value={placeQuery}
+                  onChange={(e) => setPlaceQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      searchPlace();
+                    }
+                  }}
+                  className={inputClass}
+                  placeholder='مثال: مستشفى الملك فيصل الرياض'
+                />
+                <button
+                  type='button'
+                  onClick={searchPlace}
+                  disabled={searching}
+                  className='shrink-0 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white font-medium'
+                  title='بحث'
+                >
+                  <Search size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className='md:col-span-2'>
+              <LocationPicker
+                position={position}
+                setPosition={setPosition}
+                locationText={locationText}
+                setLocationText={setLocationText}
+              />
+            </div>
+
+            <div className='md:col-span-2'>
+              <label className='block text-sm font-medium text-slate-700 mb-2 text-right'>
+                تفاصيل إضافية <span className='text-red-500'>*</span>
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                required
+                className={`${inputClass} resize-none`}
+                placeholder='اكتب تفاصيل تساعد المتطوع على فهم الطلب...'
+              />
+            </div>
           </div>
 
           {error && (
@@ -277,13 +345,18 @@ const RequestHelp = () => {
               {error}
             </div>
           )}
+          {success && (
+            <div className='bg-emerald-50 text-emerald-700 text-sm px-4 py-3 rounded-xl border border-emerald-100'>
+              {success}
+            </div>
+          )}
 
           <button
             type='submit'
-            disabled={submitting}
-            className='w-full bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white py-3.5 rounded-xl font-semibold transition-all shadow-lg shadow-teal-700/20 hover:-translate-y-0.5'
+            disabled={saving}
+            className='w-full md:w-auto bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:opacity-60 text-white px-8 py-3.5 rounded-xl font-semibold shadow-md'
           >
-            {submitting ? "جاري إرسال الطلب..." : "إرسال طلب المساعدة"}
+            {saving ? "جاري الإرسال..." : "إرسال الطلب"}
           </button>
         </form>
       </main>
