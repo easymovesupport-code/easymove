@@ -236,7 +236,7 @@ export const useRegisterForm = (type) => {
       setLoading(false);
     }
   };
-
+  // تصدير القيم والوظائف من الـ hook
   return {
     isVolunteer,
     step,

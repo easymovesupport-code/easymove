@@ -17,6 +17,7 @@ import {
 
 const DisabledDashboard = () => {
   const navigate = useNavigate();
+  const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,12 @@ const DisabledDashboard = () => {
   });
   const [recentRequests, setRecentRequests] = useState([]);
   const [notifications, setNotifications] = useState([]);
+
+  // مودال التقييم
+  const [ratingReq, setRatingReq] = useState(null);
+  const [rating, setRating] = useState(5);
+  const [ratingComment, setRatingComment] = useState("");
+  const [actionLoading, setActionLoading] = useState(null);
 
   const statusStyle = {
     pending: "bg-amber-50 text-amber-700 border-amber-200",
@@ -42,91 +49,101 @@ const DisabledDashboard = () => {
     cancelled: "ملغي",
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
+  const loadData = async () => {
+    setLoading(true);
 
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData?.user) {
-        navigate("/login?type=disabled");
-        return;
-      }
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user) {
+      navigate("/login?type=disabled");
+      return;
+    }
 
-      const { data: userRow } = await supabase
-        .from("users")
-        .select("id, name")
-        .eq("email", authData.user.email)
-        .eq("user_type", "disabled")
-        .single();
+    const { data: userRow } = await supabase
+      .from("users")
+      .select("id, name")
+      .eq("email", authData.user.email)
+      .eq("user_type", "disabled")
+      .single();
 
-      if (!userRow) {
-        navigate("/login?type=disabled");
-        return;
-      }
+    if (!userRow) {
+      navigate("/login?type=disabled");
+      return;
+    }
 
-      setUserName(userRow.name || "مستخدم");
+    setUserId(userRow.id);
+    setUserName(userRow.name || "مستخدم");
 
-      const { data: requests } = await supabase
-        .from("help_requests")
-        .select("id, title, status, request_date, request_time, created_at")
-        .eq("user_id", userRow.id)
-        .order("created_at", { ascending: false })
-        .limit(10);
+    const { data: requests } = await supabase
+      .from("help_requests")
+      .select(
+        `
+        id, title, status, request_date, request_time, time_from, time_to,
+        created_at, volunteer_id, rating,
+        volunteer:users!help_requests_volunteer_id_fkey (
+          id, name, phone, city
+        )
+      `,
+      )
+      .eq("user_id", userRow.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
 
-      const list = requests || [];
-      setRecentRequests(list.slice(0, 5));
+    const list = requests || [];
+    setRecentRequests(list.slice(0, 5));
 
-      setStats({
-        activeRequests: list.filter((r) =>
-          ["pending", "accepted"].includes(r.status),
-        ).length,
-        completedRequests: list.filter((r) => r.status === "completed").length,
-        messages: list.filter((r) => r.status === "accepted").length,
+    setStats({
+      activeRequests: list.filter((r) =>
+        ["pending", "accepted"].includes(r.status),
+      ).length,
+      completedRequests: list.filter((r) => r.status === "completed").length,
+      messages: list.filter((r) => r.status === "accepted").length,
+    });
+
+    const notifs = [];
+
+    list
+      .filter((r) => r.status === "accepted")
+      .forEach((r) => {
+        notifs.push({
+          id: `accepted-${r.id}`,
+          type: "accepted",
+          title: "تم قبول طلبك",
+          body: r.volunteer?.name
+            ? `قبل الطلب: ${r.volunteer.name}`
+            : `المتطوع قبل طلب: ${r.title}`,
+          time: r.created_at,
+          link: `/disabled/chat/${r.id}`,
+        });
       });
 
-      const notifs = [];
+    const requestIds = list.map((r) => r.id);
+    if (requestIds.length > 0) {
+      const { data: msgs } = await supabase
+        .from("messages")
+        .select("id, request_id, sender_id, body, created_at")
+        .in("request_id", requestIds)
+        .neq("sender_id", userRow.id)
+        .order("created_at", { ascending: false })
+        .limit(8);
 
-      list
-        .filter((r) => r.status === "accepted")
-        .forEach((r) => {
-          notifs.push({
-            id: `accepted-${r.id}`,
-            type: "accepted",
-            title: "تم قبول طلبك",
-            body: `المتطوع قبل طلب: ${r.title}`,
-            time: r.created_at,
-            link: `/disabled/chat/${r.id}`,
-          });
+      (msgs || []).forEach((m) => {
+        notifs.push({
+          id: `msg-${m.id}`,
+          type: "message",
+          title: "رسالة جديدة من المتطوع",
+          body: m.body?.slice(0, 60) || "رسالة جديدة",
+          time: m.created_at,
+          link: `/disabled/chat/${m.request_id}`,
         });
+      });
+    }
 
-      const requestIds = list.map((r) => r.id);
-      if (requestIds.length > 0) {
-        const { data: msgs } = await supabase
-          .from("messages")
-          .select("id, request_id, sender_id, body, created_at")
-          .in("request_id", requestIds)
-          .neq("sender_id", userRow.id)
-          .order("created_at", { ascending: false })
-          .limit(8);
+    notifs.sort((a, b) => new Date(b.time) - new Date(a.time));
+    setNotifications(notifs.slice(0, 10));
+    setLoading(false);
+  };
 
-        (msgs || []).forEach((m) => {
-          notifs.push({
-            id: `msg-${m.id}`,
-            type: "message",
-            title: "رسالة جديدة من المتطوع",
-            body: m.body?.slice(0, 60) || "رسالة جديدة",
-            time: m.created_at,
-            link: `/disabled/chat/${m.request_id}`,
-          });
-        });
-      }
-
-      notifs.sort((a, b) => new Date(b.time) - new Date(a.time));
-      setNotifications(notifs.slice(0, 10));
-
-      setLoading(false);
-    };
-
+  useEffect(() => {
     loadData();
   }, [navigate]);
 
@@ -145,6 +162,13 @@ const DisabledDashboard = () => {
     hours = hours % 12;
     if (hours === 0) hours = 12;
     return `${hours}:${minutes} ${period}`;
+  };
+
+  const formatTimeRange = (req) => {
+    if (req.time_from && req.time_to) {
+      return `${formatTime(req.time_from)} - ${formatTime(req.time_to)}`;
+    }
+    return formatTime(req.request_time);
   };
 
   const formatDate = (date) => {
@@ -169,6 +193,76 @@ const DisabledDashboard = () => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const rejectVolunteer = async (requestId, volunteerId) => {
+    const ok = window.confirm(
+      "هل تريدين إلغاء هذا المتطوع وإعادة فتح الطلب لمتطوعين آخرين؟",
+    );
+    if (!ok) return;
+
+    setActionLoading(requestId);
+
+    const { data: req } = await supabase
+      .from("help_requests")
+      .select("rejected_volunteer_ids")
+      .eq("id", requestId)
+      .single();
+
+    const rejected = req?.rejected_volunteer_ids || [];
+    const updatedRejected = rejected.includes(volunteerId)
+      ? rejected
+      : [...rejected, volunteerId];
+
+    const { error } = await supabase
+      .from("help_requests")
+      .update({
+        status: "pending",
+        volunteer_id: null,
+        rejected_volunteer_ids: updatedRejected,
+      })
+      .eq("id", requestId)
+      .eq("user_id", userId);
+
+    setActionLoading(null);
+
+    if (error) {
+      alert("تعذر تغيير المتطوع");
+      return;
+    }
+
+    await loadData();
+  };
+
+  const openCompleteModal = (req) => {
+    setRatingReq(req);
+    setRating(5);
+    setRatingComment("");
+  };
+
+  const submitComplete = async () => {
+    if (!ratingReq) return;
+    setActionLoading(ratingReq.id);
+
+    const { error } = await supabase
+      .from("help_requests")
+      .update({
+        status: "completed",
+        rating,
+        rating_comment: ratingComment.trim() || null,
+      })
+      .eq("id", ratingReq.id)
+      .eq("user_id", userId);
+
+    setActionLoading(null);
+
+    if (error) {
+      alert("تعذر إكمال الطلب");
+      return;
+    }
+
+    setRatingReq(null);
+    await loadData();
   };
 
   const services = [
@@ -361,9 +455,7 @@ const DisabledDashboard = () => {
                   alt={service.title}
                   className='absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500'
                 />
-                {/* <div className='absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/45 to-black/10'></div> */}
                 <div className='absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/65 to-slate-900/25'></div>
-
                 <div className='relative h-full p-6 flex flex-col justify-end text-white'>
                   <div className='w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center mb-4'>
                     {service.icon}
@@ -399,66 +491,171 @@ const DisabledDashboard = () => {
               {recentRequests.map((req) => (
                 <div
                   key={req.id}
-                  className='px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-stone-50 transition-colors'
+                  className='px-5 py-4 hover:bg-stone-50 transition-colors'
                 >
-                  <div className='min-w-0 flex-1'>
-                    <p className='font-bold text-slate-900 text-base mb-3'>
-                      {req.title}
-                    </p>
-                    <div className='flex flex-wrap gap-2'>
-                      <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
-                        <Clock size={14} className='text-teal-600' />
-                        <strong>{formatTime(req.request_time)}</strong>
-                      </span>
-                      <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
-                        <span className='text-teal-600 text-xs font-bold'>
-                          يوم:
+                  <div className='flex flex-col lg:flex-row lg:items-center justify-between gap-4'>
+                    <div className='min-w-0 flex-1'>
+                      <p className='font-bold text-slate-900 text-base mb-3'>
+                        {req.title}
+                      </p>
+                      <div className='flex flex-wrap gap-2'>
+                        <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
+                          <Clock size={14} className='text-teal-600' />
+                          <strong>{formatTimeRange(req)}</strong>
                         </span>
-                        <strong>{formatDay(req.request_date)}</strong>
-                      </span>
-                      <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
-                        <span className='text-teal-600 text-xs font-bold'>
-                          تاريخ:
+                        <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
+                          <span className='text-teal-600 text-xs font-bold'>
+                            يوم:
+                          </span>
+                          <strong>{formatDay(req.request_date)}</strong>
                         </span>
-                        <strong>{formatDate(req.request_date)}</strong>
+                        <span className='inline-flex items-center gap-1.5 text-sm bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg'>
+                          <span className='text-teal-600 text-xs font-bold'>
+                            تاريخ:
+                          </span>
+                          <strong>{formatDate(req.request_date)}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className='flex flex-wrap items-center gap-3 shrink-0'>
+                      <span
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
+                          statusStyle[req.status] || statusStyle.pending
+                        }`}
+                      >
+                        {statusLabel[req.status] || req.status}
                       </span>
+
+                      {req.status === "pending" && (
+                        <Link
+                          to={`/disabled/edit-request/${req.id}`}
+                          className='inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all'
+                        >
+                          تعديل الطلب
+                        </Link>
+                      )}
+
+                      {req.status === "completed" && req.rating && (
+                        <span className='text-sm text-amber-600 font-semibold'>
+                          تقييمك: {req.rating}/5
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className='flex flex-wrap items-center gap-3 shrink-0'>
-                    <span
-                      className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
-                        statusStyle[req.status] || statusStyle.pending
-                      }`}
-                    >
-                      {statusLabel[req.status] || req.status}
-                    </span>
+                  {/* بيانات المتطوع عند القبول */}
+                  {req.status === "accepted" && req.volunteer && (
+                    <div className='mt-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-right'>
+                      <p className='font-bold text-emerald-900 mb-2'>
+                        المتطوع الذي قبل الطلب
+                      </p>
+                      <div className='grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-slate-700 mb-3'>
+                        <p>
+                          <span className='text-slate-500'>الاسم: </span>
+                          <strong>{req.volunteer.name}</strong>
+                        </p>
+                        <p>
+                          <span className='text-slate-500'>الجوال: </span>
+                          <strong>{req.volunteer.phone || "—"}</strong>
+                        </p>
+                        <p>
+                          <span className='text-slate-500'>المدينة: </span>
+                          <strong>{req.volunteer.city || "—"}</strong>
+                        </p>
+                      </div>
 
-                    {req.status === "pending" && (
-                      <Link
-                        to={`/disabled/edit-request/${req.id}`}
-                        className='inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-sm hover:shadow-md transition-all'
-                      >
-                        تعديل الطلب
-                      </Link>
-                    )}
+                      <div className='flex flex-wrap gap-2'>
+                        <Link
+                          to={`/disabled/chat/${req.id}`}
+                          className='inline-flex items-center gap-2 bg-gradient-to-l from-teal-600 to-cyan-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl'
+                        >
+                          <MessageCircle size={16} />
+                          محادثة
+                        </Link>
 
-                    {req.status === "accepted" && (
-                      <Link
-                        to={`/disabled/chat/${req.id}`}
-                        className='inline-flex items-center justify-center gap-2 bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md shadow-teal-700/20 transition-all'
-                      >
-                        <MessageCircle size={16} />
-                        محادثة مع المتطوع
-                      </Link>
-                    )}
-                  </div>
+                        <button
+                          type='button'
+                          disabled={actionLoading === req.id}
+                          onClick={() =>
+                            rejectVolunteer(req.id, req.volunteer_id)
+                          }
+                          className='px-4 py-2.5 rounded-xl bg-white border border-red-200 text-red-600 text-sm font-semibold disabled:opacity-60'
+                        >
+                          تغيير المتطوع
+                        </button>
+
+                        <button
+                          type='button'
+                          onClick={() => openCompleteModal(req)}
+                          className='px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold'
+                        >
+                          تمّت المساعدة
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </section>
       </main>
+
+      {/* مودال التقييم */}
+      {ratingReq && (
+        <div className='fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4'>
+          <div className='bg-white rounded-3xl p-6 w-full max-w-md text-right'>
+            <h3 className='text-lg font-bold mb-2'>تقييم المتطوع</h3>
+            <p className='text-sm text-slate-500 mb-4'>
+              بعد إكمال المساعدة، قيّمي تجربة المتطوع
+            </p>
+
+            <div className='flex gap-2 justify-center mb-4'>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type='button'
+                  onClick={() => setRating(n)}
+                  className={`w-10 h-10 rounded-full font-bold ${
+                    rating >= n
+                      ? "bg-amber-400 text-white"
+                      : "bg-stone-100 text-slate-400"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+
+            <textarea
+              value={ratingComment}
+              onChange={(e) => setRatingComment(e.target.value)}
+              rows={3}
+              className='w-full border border-stone-200 rounded-xl px-3 py-2 text-sm mb-4 text-right'
+              placeholder='تعليق اختياري...'
+            />
+
+            <div className='flex gap-2'>
+              <button
+                type='button'
+                onClick={submitComplete}
+                disabled={actionLoading === ratingReq.id}
+                className='flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-semibold disabled:opacity-60'
+              >
+                تأكيد الإكمال
+              </button>
+              <button
+                type='button'
+                onClick={() => setRatingReq(null)}
+                className='flex-1 border border-stone-200 py-2.5 rounded-xl'
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
