@@ -19,6 +19,7 @@ import DisabledProfileView from "./pages/disabled/ProfileView";
 import DisabledProfileEdit from "./pages/disabled/Profile"; // الصفحة الحالية للتعديل
 import VolunteerProfileView from "./pages/volunteer/ProfileView";
 import VolunteerProfileEdit from "./pages/volunteer/VolunteerProfile";
+import VolunteerInfo from "./pages/disabled/VolunteerInfo";
 
 // مكوّن داخلي عشان useLocation يشتغل صح
 const AppLayout = () => {
@@ -61,6 +62,10 @@ const AppLayout = () => {
           <Route
             path='/volunteer/profile/edit'
             element={<VolunteerProfileEdit />}
+          />
+          <Route
+            path='/disabled/volunteer-info/:requestId'
+            element={<VolunteerInfo />}
           />
         </Routes>
       </main>
