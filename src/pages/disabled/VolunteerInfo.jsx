@@ -10,6 +10,7 @@ import {
   Building2,
   GraduationCap,
   MessageCircle,
+  Calendar,
 } from "lucide-react";
 
 const VolunteerInfo = () => {
@@ -34,9 +35,9 @@ const VolunteerInfo = () => {
         .select(
           `
           id, title, status, volunteer_id,
-          volunteer:users!help_requests_volunteer_id_fkey (
-            id, name, phone, city, nationality, education, profile_image
-          )
+         volunteer:users!help_requests_volunteer_id_fkey (
+  id, name, phone, city, nationality, education, profile_image, date_of_birth
+)
         `,
         )
         .eq("id", requestId)
@@ -65,11 +66,23 @@ const VolunteerInfo = () => {
       </div>
     );
   }
+  // دالة حساب العمر
+  const getAge = (dob) => {
+    if (!dob) return null;
+    const birth = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
   // تحديد التسمية للمؤهل العلمي للمتطوع بناءً على القيمة المخزنة في قاعدة البيانات
   const educationLabel =
     EDUCATION_OPTIONS.find((e) => e.id === volunteer.education)?.label ||
     volunteer.education ||
     "—";
+
+  const age = getAge(volunteer.date_of_birth);
 
   const rows = [
     {
@@ -77,6 +90,12 @@ const VolunteerInfo = () => {
       value: volunteer.name,
       icon: User,
       color: "bg-teal-100 text-teal-700",
+    },
+    {
+      label: "العمر",
+      value: age != null ? `${age} سنة` : "—",
+      icon: Calendar, // استوردي Calendar من lucide-react
+      color: "bg-amber-100 text-amber-700",
     },
     {
       label: "المؤهل العلمي",
