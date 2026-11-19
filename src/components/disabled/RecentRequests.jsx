@@ -41,15 +41,14 @@ const formatDay = (date) => {
   if (!date) return "—";
   return new Date(date).toLocaleDateString("ar-SA", { weekday: "long" });
 };
-
 const primaryBtn =
-  "inline-flex items-center justify-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-3.5 py-2 rounded-xl transition-all whitespace-nowrap";
+  "inline-flex items-center justify-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all whitespace-nowrap shrink-0";
 
 const dangerBtn =
-  "inline-flex items-center justify-center gap-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold px-3.5 py-2 rounded-xl transition-all disabled:opacity-60 whitespace-nowrap";
+  "inline-flex items-center justify-center gap-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold px-3 py-2 rounded-xl transition-all disabled:opacity-60 whitespace-nowrap shrink-0";
 
 const successBtn =
-  "inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-3.5 py-2 rounded-xl transition-all whitespace-nowrap";
+  "inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all whitespace-nowrap shrink-0";
 
 const RequestCard = ({
   req,
@@ -102,58 +101,61 @@ const RequestCard = ({
       </div>
 
       {/* الأزرار */}
-      <div className='mt-5 pt-4 border-t border-stone-100 flex flex-wrap items-center gap-2'>
-        {type === "pending" && (
-          <>
-            <Link
-              to={`/disabled/edit-request/${req.id}`}
-              className={primaryBtn}
-            >
-              <Pencil size={15} />
-              تعديل الطلب
-            </Link>
-            <button
-              type='button'
-              disabled={actionLoading === req.id}
-              onClick={() => onCancelRequest(req.id)}
-              className={dangerBtn}
-            >
-              <X size={15} />
-              إلغاء الطلب
-            </button>
-          </>
-        )}
+      {/* الأزرار - صف واحد بدون لف */}
+      <div className='mt-5 pt-4 border-t border-stone-100'>
+        <div className='flex flex-nowrap items-center gap-2 overflow-x-auto pb-1'>
+          {type === "pending" && (
+            <>
+              <Link
+                to={`/disabled/edit-request/${req.id}`}
+                className={primaryBtn}
+              >
+                <Pencil size={15} />
+                تعديل الطلب
+              </Link>
+              <button
+                type='button'
+                disabled={actionLoading === req.id}
+                onClick={() => onCancelRequest(req.id)}
+                className={dangerBtn}
+              >
+                <X size={15} />
+                إلغاء الطلب
+              </button>
+            </>
+          )}
 
-        {type === "accepted" && (
-          <>
-            <Link to={`/disabled/chat/${req.id}`} className={primaryBtn}>
-              <MessageCircle size={15} />
-              المحادثة
-            </Link>
-            <Link
-              to={`/disabled/volunteer-info/${req.id}`}
-              className={primaryBtn}
-            >
-              <UserRound size={15} />
-              نبذة عن المتطوع
-            </Link>
-            <button
-              type='button'
-              disabled={actionLoading === req.id}
-              onClick={() => onRejectVolunteer(req.id, req.volunteer_id)}
-              className={dangerBtn}
-            >
-              تغيير المتطوع
-            </button>
-            <button
-              type='button'
-              onClick={() => onComplete(req)}
-              className={successBtn}
-            >
-              تمّت المساعدة
-            </button>
-          </>
-        )}
+          {type === "accepted" && (
+            <>
+              <Link to={`/disabled/chat/${req.id}`} className={primaryBtn}>
+                <MessageCircle size={15} />
+                المحادثة
+              </Link>
+              <Link
+                to={`/disabled/volunteer-info/${req.id}`}
+                className={primaryBtn}
+              >
+                <UserRound size={15} />
+                نبذة عن المتطوع
+              </Link>
+              <button
+                type='button'
+                disabled={actionLoading === req.id}
+                onClick={() => onRejectVolunteer(req.id, req.volunteer_id)}
+                className={dangerBtn}
+              >
+                تغيير المتطوع
+              </button>
+              <button
+                type='button'
+                onClick={() => onComplete(req)}
+                className={successBtn}
+              >
+                تمّت المساعدة
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
