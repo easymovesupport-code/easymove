@@ -36,8 +36,7 @@ const VolunteerInfo = () => {
           `
           id, title, status, volunteer_id,
          volunteer:users!help_requests_volunteer_id_fkey (
-  id, name, phone, city, nationality, education, profile_image, date_of_birth
-)
+  id, name, phone, city, nationality, education, profile_image, date_of_birth)
         `,
         )
         .eq("id", requestId)
