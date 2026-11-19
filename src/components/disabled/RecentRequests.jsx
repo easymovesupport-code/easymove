@@ -6,6 +6,7 @@ import {
   Hourglass,
   CheckCircle2,
   Pencil,
+  X,
 } from "lucide-react";
 // تنسيق الوقت من صيغة 24 ساعة إلى صيغة 12 ساعة مع تحديد الفترة (ص/م)
 const formatTime = (time) => {
@@ -56,6 +57,7 @@ const RequestCard = ({
   actionLoading,
   onRejectVolunteer,
   onComplete,
+  onCancelRequest,
 }) => {
   return (
     <div className='bg-white border border-stone-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow'>
@@ -86,7 +88,7 @@ const RequestCard = ({
       </div>
 
       {/* الوقت والتاريخ */}
-      <div className='flex flex-wrap gap-2 mb-4'>
+      <div className='flex flex-wrap gap-2 mt-3'>
         <span className='inline-flex items-center gap-1.5 text-xs bg-stone-50 text-slate-700 border border-stone-200 px-2.5 py-1 rounded-lg'>
           <Clock size={13} className='text-teal-600' />
           {formatTimeRange(req)}
@@ -100,46 +102,59 @@ const RequestCard = ({
       </div>
 
       {/* الأزرار */}
-      {type === "pending" && (
-        <Link to={`/disabled/edit-request/${req.id}`} className={primaryBtn}>
-          <Pencil size={15} />
-          تعديل الطلب
-        </Link>
-      )}
+      <div className='mt-5 pt-4 border-t border-stone-100 flex flex-wrap items-center gap-2'>
+        {type === "pending" && (
+          <>
+            <Link
+              to={`/disabled/edit-request/${req.id}`}
+              className={primaryBtn}
+            >
+              <Pencil size={15} />
+              تعديل الطلب
+            </Link>
+            <button
+              type='button'
+              disabled={actionLoading === req.id}
+              onClick={() => onCancelRequest(req.id)}
+              className={dangerBtn}
+            >
+              <X size={15} />
+              إلغاء الطلب
+            </button>
+          </>
+        )}
 
-      {type === "accepted" && (
-        <div className='flex flex-wrap gap-2'>
-          <Link to={`/disabled/chat/${req.id}`} className={primaryBtn}>
-            <MessageCircle size={15} />
-            المحادثة
-          </Link>
-
-          <Link
-            to={`/disabled/volunteer-info/${req.id}`}
-            className={primaryBtn}
-          >
-            <UserRound size={15} />
-            نبذة عن المتطوع
-          </Link>
-
-          <button
-            type='button'
-            disabled={actionLoading === req.id}
-            onClick={() => onRejectVolunteer(req.id, req.volunteer_id)}
-            className={dangerBtn}
-          >
-            تغيير المتطوع
-          </button>
-
-          <button
-            type='button'
-            onClick={() => onComplete(req)}
-            className={successBtn}
-          >
-            تمّت المساعدة
-          </button>
-        </div>
-      )}
+        {type === "accepted" && (
+          <>
+            <Link to={`/disabled/chat/${req.id}`} className={primaryBtn}>
+              <MessageCircle size={15} />
+              المحادثة
+            </Link>
+            <Link
+              to={`/disabled/volunteer-info/${req.id}`}
+              className={primaryBtn}
+            >
+              <UserRound size={15} />
+              نبذة عن المتطوع
+            </Link>
+            <button
+              type='button'
+              disabled={actionLoading === req.id}
+              onClick={() => onRejectVolunteer(req.id, req.volunteer_id)}
+              className={dangerBtn}
+            >
+              تغيير المتطوع
+            </button>
+            <button
+              type='button'
+              onClick={() => onComplete(req)}
+              className={successBtn}
+            >
+              تمّت المساعدة
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 };
@@ -155,6 +170,7 @@ const RecentRequests = ({
   actionLoading,
   onRejectVolunteer,
   onComplete,
+  onCancelRequest,
 }) => {
   // تصفية الطلبات حسب حالتها (قيد الانتظار أو مقبولة) وإضافة رقم عرض لكل طلب
   // هنا الطلبات التي في حالة "pending" يتم ترقيمها من 1 إلى N، والطلبات التي في حالة "accepted" يتم ترقيمها بشكل منفصل من 1 إلى M
@@ -202,6 +218,7 @@ const RecentRequests = ({
                   actionLoading={actionLoading}
                   onRejectVolunteer={onRejectVolunteer}
                   onComplete={onComplete}
+                  onCancelRequest={onCancelRequest}
                 />
               ))
             )}
@@ -236,6 +253,7 @@ const RecentRequests = ({
                   actionLoading={actionLoading}
                   onRejectVolunteer={onRejectVolunteer}
                   onComplete={onComplete}
+                  onCancelRequest={onCancelRequest}
                 />
               ))
             )}

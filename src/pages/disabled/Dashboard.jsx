@@ -27,6 +27,7 @@ const DisabledDashboard = () => {
     openCompleteModal,
     submitComplete,
     navigate,
+    cancelRequest,
   } = useDisabledDashboard();
 
   if (loading) {
@@ -73,6 +74,7 @@ const DisabledDashboard = () => {
           actionLoading={actionLoading}
           onRejectVolunteer={rejectVolunteer}
           onComplete={openCompleteModal}
+          onCancelRequest={cancelRequest}
         />
       </main>
 

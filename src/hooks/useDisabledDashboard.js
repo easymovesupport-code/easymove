@@ -202,7 +202,29 @@ export const useDisabledDashboard = () => {
     setRatingReq(null);
     await loadData();
   };
+  //   تعريف دالة cancelRequest لإلغاء الطلب نهائيًا
+  const cancelRequest = async (requestId) => {
+    const ok = window.confirm("هل تريدين إلغاء هذا الطلب نهائياً؟");
+    if (!ok) return;
 
+    setActionLoading(requestId);
+
+    const { error } = await supabase
+      .from("help_requests")
+      .delete()
+      .eq("id", requestId)
+      .eq("user_id", userId)
+      .eq("status", "pending");
+
+    setActionLoading(null);
+
+    if (error) {
+      alert("تعذر إلغاء الطلب");
+      return;
+    }
+
+    await loadData();
+  };
   return {
     userName,
     notifOpen,
@@ -223,5 +245,6 @@ export const useDisabledDashboard = () => {
     openCompleteModal,
     submitComplete,
     navigate,
+    cancelRequest,
   };
 };
