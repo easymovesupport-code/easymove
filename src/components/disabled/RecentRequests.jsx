@@ -43,13 +43,13 @@ const formatDay = (date) => {
 };
 
 const primaryBtn =
-  "inline-flex items-center justify-center gap-2 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all";
+  "inline-flex items-center justify-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white text-sm font-semibold px-3.5 py-2 rounded-xl transition-all whitespace-nowrap";
 
 const dangerBtn =
-  "inline-flex items-center justify-center gap-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all disabled:opacity-60";
+  "inline-flex items-center justify-center gap-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold px-3.5 py-2 rounded-xl transition-all disabled:opacity-60 whitespace-nowrap";
 
 const successBtn =
-  "inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all";
+  "inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-3.5 py-2 rounded-xl transition-all whitespace-nowrap";
 
 const RequestCard = ({
   req,
@@ -62,7 +62,7 @@ const RequestCard = ({
   return (
     <div className='bg-white border border-stone-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow'>
       {/* العنوان + الرقم + الحالة */}
-      <div className='flex items-start justify-between gap-3 mb-3'>
+      <div className='flex items-start justify-between gap-3 '>
         <div className='flex items-start gap-3 min-w-0'>
           {/* رقم الطلب */}
           <span className='shrink-0 w-8 h-8 rounded-full bg-teal-50 text-teal-700 border border-teal-100 flex items-center justify-center text-sm font-bold'>
