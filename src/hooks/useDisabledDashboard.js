@@ -24,7 +24,7 @@ export const useDisabledDashboard = () => {
   const [actionLoading, setActionLoading] = useState(null);
   // تعريف دالة loadData لتحميل البيانات من قاعدة البيانات
   const loadData = useCallback(async () => {
-    const { data: authData } = await supabase.auth.getSession();
+    const { data: authData } = await supabase.auth.getUser();
     if (!authData?.user) {
       navigate("/login?type=disabled");
       return;
@@ -209,39 +209,17 @@ export const useDisabledDashboard = () => {
 
     setActionLoading(requestId);
 
-    // جلب userId مباشرة من الجلسة (أكثر أماناً من الاعتماد على state)
-    const { data: authData } = await supabase.auth.getSession();
-    if (!authData?.user) {
-      setActionLoading(null);
-      navigate("/login?type=disabled");
-      return;
-    }
-
-    const { data: userRow } = await supabase
-      .from("users")
-      .select("id")
-      .eq("email", authData.user.email)
-      .eq("user_type", "disabled")
-      .maybeSingle();
-
-    if (!userRow) {
-      setActionLoading(null);
-      alert("تعذر التحقق من الحساب");
-      return;
-    }
-
     const { error } = await supabase
       .from("help_requests")
-      .update({ status: "cancelled" })
+      .delete()
       .eq("id", requestId)
-      .eq("user_id", userRow.id)
+      .eq("user_id", userId)
       .eq("status", "pending");
 
     setActionLoading(null);
 
     if (error) {
-      console.error(error);
-      alert("تعذر إلغاء الطلب: " + error.message);
+      alert("تعذر إلغاء الطلب");
       return;
     }
 
