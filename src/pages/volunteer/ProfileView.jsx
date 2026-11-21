@@ -38,10 +38,11 @@ const ProfileView = () => {
         return;
       }
 
+      // تعديل: إضافة profile_image في الاستعلام لعرض صورة المتطوع
       const { data: userRow } = await supabase
         .from("users")
         .select(
-          "id, name, phone, gender, date_of_birth, nationality, city, location_text, email, marital_status, education",
+          "id, name, phone, gender, date_of_birth, nationality, city, location_text, email, marital_status, education, profile_image",
         )
         .eq("email", authData.user.email)
         .eq("user_type", "volunteer")
@@ -180,20 +181,26 @@ const ProfileView = () => {
 
       <main className='max-w-3xl mx-auto px-4 py-10'>
         <div className='bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-stone-100 overflow-hidden'>
-          {/* البانر */}
           <div className='relative h-36 bg-gradient-to-l from-teal-700 via-emerald-600 to-cyan-600'>
             <div className='absolute inset-0 opacity-30'>
               <div className='absolute -top-10 -right-10 w-48 h-48 bg-white/20 rounded-full blur-2xl'></div>
               <div className='absolute bottom-0 left-10 w-40 h-40 bg-cyan-300/30 rounded-full blur-2xl'></div>
-              <div className='absolute top-6 left-1/3 w-24 h-24 bg-emerald-200/20 rounded-full blur-xl'></div>
             </div>
           </div>
 
           <div className='relative px-6 pb-6'>
-            {/* أيقونة بدل صورة */}
+            {/* تعديل: عرض صورة المتطوع إن وُجدت، وإلا أيقونة افتراضية */}
             <div className='flex flex-col items-center -mt-14'>
-              <div className='w-28 h-28 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-teal-100 to-emerald-100 flex items-center justify-center'>
-                <User size={48} className='text-teal-700' />
+              <div className='w-28 h-28 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gradient-to-br from-teal-100 to-emerald-100 flex items-center justify-center'>
+                {user?.profile_image ? (
+                  <img
+                    src={user.profile_image}
+                    alt={user?.name || "متطوع"}
+                    className='w-full h-full object-cover'
+                  />
+                ) : (
+                  <User size={48} className='text-teal-700' />
+                )}
               </div>
 
               <h1 className='mt-4 text-2xl font-bold text-slate-900 text-center'>
@@ -204,7 +211,6 @@ const ProfileView = () => {
               </p>
             </div>
 
-            {/* البيانات عمودين */}
             <div className='mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3'>
               {rows.map((r) => {
                 const Icon = r.icon;
@@ -230,6 +236,7 @@ const ProfileView = () => {
             </div>
 
             <div className='mt-8 flex justify-center'>
+              {/* تعديل: الرابط يذهب لصفحة EditProfile */}
               <Link
                 to='/volunteer/profile/edit'
                 className='inline-flex items-center gap-2 bg-gradient-to-l from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white px-8 py-3 rounded-xl font-semibold shadow-md shadow-teal-700/20 transition-all'

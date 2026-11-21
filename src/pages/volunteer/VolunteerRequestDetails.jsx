@@ -6,6 +6,7 @@ import {
   Marker,
   Popup,
   Polyline,
+  useMap,
 } from "react-leaflet";
 import L from "leaflet";
 import { supabase } from "../../lib/supabase";
@@ -13,10 +14,9 @@ import "../../utils/leafletIcon";
 import {
   ArrowRight,
   CalendarDays,
-  Clock3,
   MapPin,
   Navigation,
-  CheckCircle2,
+  User,
 } from "lucide-react";
 
 const DAY_NAMES = [
@@ -29,6 +29,45 @@ const DAY_NAMES = [
   "السبت",
 ];
 
+const getDayName = (date) => {
+  if (!date) return "—";
+  return DAY_NAMES[new Date(date).getDay()];
+};
+
+const formatTime = (time) => {
+  if (!time) return "—";
+  const [hStr, mStr = "00"] = String(time).split(":");
+  let h = Number(hStr);
+  const m = mStr.padStart(2, "0");
+  if (Number.isNaN(h)) return "—";
+  const period = h >= 12 ? "م" : "ص";
+  h = h % 12 || 12;
+  return `${h}:${m} ${period}`;
+};
+
+const calcHours = (from, to) => {
+  if (!from || !to) return "—";
+  const [fh, fm] = String(from).split(":").map(Number);
+  const [th, tm] = String(to).split(":").map(Number);
+  const mins = th * 60 + tm - (fh * 60 + fm);
+  if (mins <= 0) return "—";
+  const hours = Math.floor(mins / 60);
+  const rem = mins % 60;
+  if (hours === 0) return `${rem} دقيقة`;
+  if (rem === 0) return `${hours} ساعة`;
+  return `${hours} ساعة و ${rem} دقيقة`;
+};
+
+const getAge = (dob) => {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+};
+
 const getDistanceKm = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -40,40 +79,41 @@ const getDistanceKm = (lat1, lon1, lat2, lon2) => {
       Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
+const FitBounds = ({ points }) => {
+  const map = useMap();
 
-const formatTime = (time) => {
-  if (!time) return "—";
-  const [hoursStr, minutesStr = "00"] = String(time).split(":");
-  let hours = Number(hoursStr);
-  const minutes = minutesStr.padStart(2, "0");
-  if (Number.isNaN(hours)) return "—";
-  const period = hours >= 12 ? "م" : "ص";
-  hours = hours % 12;
-  if (hours === 0) hours = 12;
-  return `${hours}:${minutes} ${period}`;
+  useEffect(() => {
+    if (!points?.length) return;
+    if (points.length === 1) {
+      map.setView(points[0], 14);
+      return;
+    }
+    const bounds = L.latLngBounds(points);
+    map.fitBounds(bounds, { padding: [40, 40] });
+  }, [points, map]);
+
+  return null;
 };
-
-const formatDate = (date) => {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString("ar-SA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-};
-
-const volunteerIcon = L.divIcon({
-  className: "",
-  html: `<div style="width:40px;height:40px;border-radius:9999px;background:#0f766e;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:18px;">👤</div>`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
+const requestIcon = new L.Icon({
+  iconUrl:
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
 });
 
-const requestIcon = L.divIcon({
-  className: "",
-  html: `<div style="width:40px;height:40px;border-radius:9999px;background:#ea580c;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:18px;">📍</div>`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 20],
+const meIcon = new L.Icon({
+  iconUrl:
+    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
 });
 
 const VolunteerRequestDetails = () => {
@@ -81,10 +121,11 @@ const VolunteerRequestDetails = () => {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [request, setRequest] = useState(null);
-  const [volunteerUser, setVolunteerUser] = useState(null);
+  const [req, setReq] = useState(null);
+  const [owner, setOwner] = useState(null);
+  const [volunteerPos, setVolunteerPos] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -97,33 +138,46 @@ const VolunteerRequestDetails = () => {
         return;
       }
 
-      const { data: userRow } = await supabase
+      const { data: volUser } = await supabase
         .from("users")
-        .select("id, name, latitude, longitude, location_text, user_type")
+        .select("id, latitude, longitude, city")
         .eq("email", authData.user.email)
         .eq("user_type", "volunteer")
         .maybeSingle();
 
-      if (!userRow) {
-        setError("تعذر تحميل حساب المتطوع");
-        setLoading(false);
+      if (!volUser) {
+        navigate("/login?type=volunteer");
         return;
       }
-      setVolunteerUser(userRow);
 
-      const { data: reqRow, error: reqError } = await supabase
+      if (volUser.latitude != null && volUser.longitude != null) {
+        setVolunteerPos({
+          lat: Number(volUser.latitude),
+          lng: Number(volUser.longitude),
+        });
+      }
+
+      const { data: request, error: reqError } = await supabase
         .from("help_requests")
-        .select("*")
+        .select(
+          `
+          *,
+          owner:users!help_requests_user_id_fkey (
+            id, name, city, date_of_birth, phone
+          )
+        `,
+        )
         .eq("id", id)
         .maybeSingle();
 
-      if (reqError || !reqRow) {
-        setError("الطلب غير موجود");
+      if (reqError || !request) {
+        setError("تعذر تحميل الطلب");
         setLoading(false);
         return;
       }
 
-      setRequest(reqRow);
+      setReq(request);
+      setOwner(request.owner || null);
       setLoading(false);
     };
 
@@ -131,23 +185,30 @@ const VolunteerRequestDetails = () => {
   }, [id, navigate]);
 
   const handleAccept = async () => {
-    if (!volunteerUser || !request) return;
-    setActionLoading(true);
+    setSaving(true);
     setError("");
+
+    const { data: authData } = await supabase.auth.getUser();
+    const { data: volUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", authData.user.email)
+      .eq("user_type", "volunteer")
+      .maybeSingle();
 
     const { error: updateError } = await supabase
       .from("help_requests")
       .update({
         status: "accepted",
-        volunteer_id: volunteerUser.id,
+        volunteer_id: volUser.id,
       })
-      .eq("id", request.id)
+      .eq("id", id)
       .eq("status", "pending");
 
-    setActionLoading(false);
+    setSaving(false);
 
     if (updateError) {
-      setError("تعذر قبول الطلب. قد يكون قبله متطوع آخر.");
+      setError("تعذر قبول الطلب");
       return;
     }
 
@@ -157,94 +218,255 @@ const VolunteerRequestDetails = () => {
   if (loading) {
     return (
       <div
-        className='min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50 flex items-center justify-center'
+        className='min-h-screen flex items-center justify-center bg-stone-50'
         dir='rtl'
       >
-        <p className='text-slate-500'>جاري تحميل التفاصيل...</p>
+        <p className='text-slate-500'>جاري التحميل...</p>
       </div>
     );
   }
 
-  if (!request) {
+  if (!req) {
     return (
       <div
-        className='min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50 flex items-center justify-center'
+        className='min-h-screen flex items-center justify-center bg-stone-50'
         dir='rtl'
       >
-        <div className='text-center'>
-          <p className='text-slate-600 mb-4'>{error || "الطلب غير موجود"}</p>
-          <Link
-            to='/volunteer/dashboard'
-            className='text-teal-700 font-semibold'
-          >
-            العودة للوحة التحكم
-          </Link>
-        </div>
+        <p className='text-red-600'>{error || "الطلب غير موجود"}</p>
       </div>
     );
   }
 
-  const reqLat = request.latitude != null ? Number(request.latitude) : null;
-  const reqLng = request.longitude != null ? Number(request.longitude) : null;
-  const volLat =
-    volunteerUser?.latitude != null ? Number(volunteerUser.latitude) : null;
-  const volLng =
-    volunteerUser?.longitude != null ? Number(volunteerUser.longitude) : null;
+  const age = getAge(owner?.date_of_birth);
+  const distance =
+    volunteerPos && req.latitude != null && req.longitude != null
+      ? getDistanceKm(
+          volunteerPos.lat,
+          volunteerPos.lng,
+          Number(req.latitude),
+          Number(req.longitude),
+        )
+      : null;
 
-  const hasBothLocations =
-    reqLat != null &&
-    reqLng != null &&
-    volLat != null &&
-    volLng != null &&
-    !Number.isNaN(reqLat) &&
-    !Number.isNaN(reqLng) &&
-    !Number.isNaN(volLat) &&
-    !Number.isNaN(volLng);
-
-  const distanceKm = hasBothLocations
-    ? getDistanceKm(volLat, volLng, reqLat, reqLng)
-    : null;
-
-  const mapCenter = hasBothLocations
-    ? [(volLat + reqLat) / 2, (volLng + reqLng) / 2]
-    : reqLat != null && reqLng != null
-      ? [reqLat, reqLng]
-      : [24.7136, 46.6753];
-
-  const dayName = request.request_date
-    ? DAY_NAMES[new Date(request.request_date).getDay()]
-    : "—";
+  const timeFrom = req.time_from || req.request_time;
+  const timeTo = req.time_to;
 
   return (
-    <div
-      className='min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50'
-      dir='rtl'
-    >
-      <header className='bg-white/90 backdrop-blur border-b border-teal-100 sticky top-0 z-40'>
-        <div className='max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between'>
+    <div className='min-h-screen bg-stone-50' dir='rtl'>
+      <header className='bg-white border-b border-stone-200 sticky top-0 z-40'>
+        <div className='max-w-3xl mx-auto px-4 py-4 flex items-center justify-between'>
           <Link
             to='/volunteer/dashboard'
             className='inline-flex items-center gap-2 text-slate-600 hover:text-teal-700 text-sm font-medium'
           >
             <ArrowRight size={18} />
-            العودة
+            رجوع
           </Link>
-          <span className='text-lg font-bold text-teal-800'>
+          <span className='font-bold text-teal-800'>
             Easy<span className='text-teal-500'>Move</span>
           </span>
         </div>
       </header>
 
-      <main className='max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6'>
+      <main className='max-w-3xl mx-auto px-4 py-8 space-y-5'>
         <div>
-          <div className='inline-flex items-center gap-2 bg-teal-100 text-teal-800 text-xs font-semibold px-3 py-1 rounded-full mb-3'>
+          <h1 className='text-2xl font-bold text-slate-900 mb-1'>
             تفاصيل الطلب
-          </div>
-          <h1 className='text-3xl font-bold text-slate-900 mb-2'>
-            {request.title}
           </h1>
-          <p className='text-slate-500 text-sm'>النوع: {request.help_type}</p>
+          <p className='text-lg font-semibold text-teal-800'>{req.title}</p>
+          <p className='text-sm text-slate-500 mt-1'>
+            نوع الخدمة: {req.help_type}
+          </p>
         </div>
+
+        {/* بيانات المستفيد */}
+        <section className='bg-white rounded-2xl border border-stone-200 p-5 shadow-sm'>
+          <h2 className='font-bold text-slate-900 mb-4 flex items-center gap-2'>
+            <User size={18} className='text-teal-700' />
+            بيانات مقدم الطلب
+          </h2>
+          <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm'>
+            <div className='bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100'>
+              <p className='text-xs text-slate-500 mb-0.5'>الاسم</p>
+              <p className='font-semibold text-slate-900'>
+                {owner?.name || "—"}
+              </p>
+            </div>
+            <div className='bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100'>
+              <p className='text-xs text-slate-500 mb-0.5'>العمر</p>
+              <p className='font-semibold text-slate-900'>
+                {age != null ? `${age} سنة` : "—"}
+              </p>
+            </div>
+            <div className='bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100'>
+              <p className='text-xs text-slate-500 mb-0.5'>المدينة</p>
+              <p className='font-semibold text-slate-900'>
+                {owner?.city || "—"}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* تفاصيل الطلب */}
+        <section className='bg-white rounded-2xl border border-stone-200 p-5 shadow-sm space-y-4'>
+          <h2 className='font-bold text-slate-900 flex items-center gap-2'>
+            <CalendarDays size={18} className='text-teal-700' />
+            تفاصيل الطلب
+          </h2>
+
+          <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm'>
+            <div className='bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100'>
+              <p className='text-xs text-slate-500 mb-0.5'>اليوم</p>
+              <p className='font-semibold'>{getDayName(req.request_date)}</p>
+            </div>
+            <div className='bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100'>
+              <p className='text-xs text-slate-500 mb-0.5'>التاريخ</p>
+              <p className='font-semibold'>
+                {req.request_date
+                  ? new Date(req.request_date).toLocaleDateString("ar-SA", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })
+                  : "—"}
+              </p>
+            </div>
+            <div className='bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100'>
+              <p className='text-xs text-slate-500 mb-0.5'>الوقت</p>
+              <p className='font-semibold'>
+                {formatTime(timeFrom)} – {formatTime(timeTo)}
+              </p>
+            </div>
+            <div className='bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100'>
+              <p className='text-xs text-slate-500 mb-0.5'>مدة الخدمة</p>
+              <p className='font-semibold'>{calcHours(timeFrom, timeTo)}</p>
+            </div>
+            <div className='bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-100 sm:col-span-2'>
+              <p className='text-xs text-slate-500 mb-0.5'>المسافة منك</p>
+              <p className='font-semibold'>
+                {distance != null ? `${distance.toFixed(1)} كم` : "غير متاحة"}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <p className='text-xs text-slate-500 mb-1'>وصف الطلب</p>
+            <p className='text-sm text-slate-800 bg-stone-50 border border-stone-100 rounded-xl px-3 py-2.5'>
+              {req.description || "لا يوجد وصف"}
+            </p>
+          </div>
+
+          {/* المسافة بارزة */}
+          <div className='bg-teal-50 border border-teal-100 rounded-xl px-4 py-3 flex items-center justify-between gap-3'>
+            <div className='flex items-center gap-2 text-teal-800'>
+              <Navigation size={18} />
+              <span className='text-sm font-semibold'>
+                المسافة بينك وبين موقع الطلب
+              </span>
+            </div>
+            <span className='text-base font-bold text-teal-900'>
+              {distance != null ? `${distance.toFixed(1)} كم` : "غير متاحة"}
+            </span>
+          </div>
+
+          <div>
+            <p className='text-xs text-slate-500 mb-1 flex items-center gap-1'>
+              <MapPin size={14} /> موقع الطلب
+            </p>
+            <p className='text-sm font-medium text-slate-800 mb-2'>
+              {req.location || "—"}
+            </p>
+
+            {req.latitude != null && req.longitude != null && (
+              <div className='h-64 rounded-2xl overflow-hidden border border-stone-200 shadow-sm'>
+                <MapContainer
+                  center={[Number(req.latitude), Number(req.longitude)]}
+                  zoom={13}
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <TileLayer
+                    attribution='&copy; OpenStreetMap'
+                    url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                  />
+
+                  {/* علامة موقع الطلب (أحمر) */}
+                  <Marker
+                    position={[Number(req.latitude), Number(req.longitude)]}
+                    icon={requestIcon}
+                  >
+                    <Popup>
+                      <strong>موقع الطلب</strong>
+                      <br />
+                      {req.location || "موقع الخدمة"}
+                    </Popup>
+                  </Marker>
+
+                  {/* علامة موقعك (أزرق) */}
+                  {volunteerPos && (
+                    <Marker
+                      position={[volunteerPos.lat, volunteerPos.lng]}
+                      icon={meIcon}
+                    >
+                      <Popup>
+                        <strong>موقعك الحالي</strong>
+                      </Popup>
+                    </Marker>
+                  )}
+
+                  {/* خط بين الموقعين */}
+                  {volunteerPos && (
+                    <Polyline
+                      positions={[
+                        [volunteerPos.lat, volunteerPos.lng],
+                        [Number(req.latitude), Number(req.longitude)],
+                      ]}
+                      pathOptions={{
+                        color: "#0f766e",
+                        weight: 3,
+                        dashArray: "8 8",
+                        opacity: 0.85,
+                      }}
+                    />
+                  )}
+
+                  {/* ضبط الزوم ليشمل النقطتين */}
+                  <FitBounds
+                    points={[
+                      [Number(req.latitude), Number(req.longitude)],
+                      ...(volunteerPos
+                        ? [[volunteerPos.lat, volunteerPos.lng]]
+                        : []),
+                    ]}
+                  />
+                </MapContainer>
+              </div>
+            )}
+
+            {/* مفتاح الألوان */}
+            <div className='mt-2 flex flex-wrap gap-4 text-xs text-slate-600'>
+              <span className='inline-flex items-center gap-1.5'>
+                <span className='w-3 h-3 rounded-full bg-red-500'></span>
+                موقع الطلب
+              </span>
+              <span className='inline-flex items-center gap-1.5'>
+                <span className='w-3 h-3 rounded-full bg-blue-500'></span>
+                موقعك الحالي
+              </span>
+            </div>
+
+            {req.latitude != null && req.longitude != null && (
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${req.latitude},${req.longitude}`}
+                target='_blank'
+                rel='noreferrer'
+                className='inline-flex items-center gap-2 mt-3 text-sm text-teal-700 font-semibold hover:underline'
+              >
+                <Navigation size={16} />
+                فتح المسار في خرائط Google
+              </a>
+            )}
+          </div>
+        </section>
 
         {error && (
           <div className='bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100'>
@@ -252,164 +474,24 @@ const VolunteerRequestDetails = () => {
           </div>
         )}
 
-        {/* بطاقات التفاصيل */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-          <div className='bg-white/90 border border-teal-100 rounded-2xl p-4'>
-            <div className='flex items-center gap-2 text-teal-700 mb-2'>
-              <CalendarDays size={18} />
-              <span className='text-sm font-semibold'>اليوم والتاريخ</span>
-            </div>
-            <p className='font-bold text-slate-900'>{dayName}</p>
-            <p className='text-sm text-slate-600'>
-              {formatDate(request.request_date)}
-            </p>
-          </div>
-
-          <div className='bg-white/90 border border-cyan-100 rounded-2xl p-4'>
-            <div className='flex items-center gap-2 text-cyan-700 mb-2'>
-              <Clock3 size={18} />
-              <span className='text-sm font-semibold'>الوقت</span>
-            </div>
-            <p className='font-bold text-slate-900'>
-              {formatTime(request.request_time)}
-            </p>
-          </div>
-
-          <div className='bg-white/90 border border-orange-100 rounded-2xl p-4'>
-            <div className='flex items-center gap-2 text-orange-700 mb-2'>
-              <Navigation size={18} />
-              <span className='text-sm font-semibold'>المسافة منك</span>
-            </div>
-            <p className='font-bold text-slate-900'>
-              {distanceKm != null ? `${distanceKm.toFixed(1)} كم` : "غير متاحة"}
-            </p>
-          </div>
-        </div>
-
-        {/* التفاصيل النصية */}
-        <div className='bg-white/90 border border-teal-100 rounded-3xl p-6 space-y-4'>
-          <div>
-            <p className='text-sm text-slate-500 mb-1'>وصف الطلب</p>
-            <p className='text-slate-800 leading-relaxed'>
-              {request.description || "لا يوجد وصف إضافي"}
-            </p>
-          </div>
-
-          <div>
-            <p className='text-sm text-slate-500 mb-1'>موقع الطلب</p>
-            <p className='text-slate-800 flex items-start gap-2'>
-              <MapPin size={16} className='text-orange-600 mt-0.5 shrink-0' />
-              {request.location || "غير محدد"}
-            </p>
-          </div>
-
-          {volunteerUser?.location_text && (
-            <div>
-              <p className='text-sm text-slate-500 mb-1'>
-                موقعك الحالي (المسجل)
-              </p>
-              <p className='text-slate-800 flex items-start gap-2'>
-                <MapPin size={16} className='text-teal-600 mt-0.5 shrink-0' />
-                {volunteerUser.location_text}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* الخريطة */}
-        <div className='bg-white/90 border border-teal-100 rounded-3xl overflow-hidden'>
-          <div className='px-6 py-4 border-b border-teal-50 flex items-center justify-between'>
-            <h2 className='font-bold text-slate-900'>الموقع على الخريطة</h2>
-            {reqLat != null && reqLng != null && (
-              <a
-                href={
-                  hasBothLocations
-                    ? `https://www.google.com/maps/dir/?api=1&origin=${volLat},${volLng}&destination=${reqLat},${reqLng}`
-                    : `https://www.google.com/maps?q=${reqLat},${reqLng}`
-                }
-                target='_blank'
-                rel='noreferrer'
-                className='text-sm font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-lg transition-colors'
-              >
-                فتح في Google Maps
-              </a>
-            )}
-          </div>
-
-          <div className='h-[380px]'>
-            {reqLat != null && reqLng != null ? (
-              <MapContainer
-                center={mapCenter}
-                zoom={hasBothLocations ? 12 : 14}
-                style={{ height: "100%", width: "100%" }}
-              >
-                <TileLayer
-                  attribution='&copy; OpenStreetMap'
-                  url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-                />
-
-                {hasBothLocations && (
-                  <>
-                    <Marker position={[volLat, volLng]} icon={volunteerIcon}>
-                      <Popup>موقعك</Popup>
-                    </Marker>
-                    <Polyline
-                      positions={[
-                        [volLat, volLng],
-                        [reqLat, reqLng],
-                      ]}
-                      pathOptions={{
-                        color: "#0f766e",
-                        weight: 3,
-                        opacity: 0.7,
-                      }}
-                    />
-                  </>
-                )}
-
-                <Marker position={[reqLat, reqLng]} icon={requestIcon}>
-                  <Popup>موقع الطلب</Popup>
-                </Marker>
-              </MapContainer>
-            ) : (
-              <div className='h-full flex items-center justify-center text-slate-400 text-sm'>
-                لا تتوفر إحداثيات لهذا الطلب
-              </div>
-            )}
-          </div>
-
-          <div className='px-6 py-3 bg-stone-50 text-xs text-slate-500 flex flex-wrap gap-4'>
-            <span>👤 موقع المتطوع</span>
-            <span>📍 موقع الطلب</span>
-            {distanceKm != null && (
-              <span className='text-teal-700 font-semibold'>
-                المسافة التقريبية: {distanceKm.toFixed(1)} كم
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* زر القبول */}
-        {request.status === "pending" && (
-          <div className='flex flex-col sm:flex-row gap-3'>
+        <div className='flex flex-wrap gap-3'>
+          {req.status === "pending" && (
             <button
               type='button'
-              disabled={actionLoading}
+              disabled={saving}
               onClick={handleAccept}
-              className='inline-flex items-center justify-center gap-2 bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 disabled:opacity-60 text-white px-8 py-3.5 rounded-xl font-semibold shadow-lg shadow-teal-700/20 transition-all'
+              className='bg-teal-700 hover:bg-teal-800 disabled:opacity-60 text-white px-6 py-3 rounded-xl font-semibold'
             >
-              <CheckCircle2 size={18} />
-              {actionLoading ? "جاري القبول..." : "قبول الطلب"}
+              {saving ? "جاري القبول..." : "قبول الطلب"}
             </button>
-
-            <Link
-              to='/volunteer/dashboard'
-              className='inline-flex items-center justify-center px-8 py-3.5 rounded-xl font-semibold border border-stone-200 bg-white text-slate-700 hover:bg-stone-50 transition-colors'
-            >
-              رجوع
-            </Link>
-          </div>
-        )}
+          )}
+          <Link
+            to='/volunteer/dashboard'
+            className='border border-stone-200 bg-white text-slate-700 px-6 py-3 rounded-xl font-semibold'
+          >
+            رجوع
+          </Link>
+        </div>
       </main>
     </div>
   );

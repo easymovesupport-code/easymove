@@ -8,9 +8,11 @@ import {
   MARITAL_OPTIONS,
   EDUCATION_OPTIONS,
 } from "../../constants/registerConstants";
+import { SAUDI_CITIES } from "../../constants/cities"; // تعديل: لاستيراد المدن
 import { ArrowRight, Save, Camera } from "lucide-react";
 
-const VolunteerProfile = () => {
+// تعديل: إعادة تسمية المكوّن إلى EditProfile
+const EditProfile = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -31,6 +33,10 @@ const VolunteerProfile = () => {
   const [profileFile, setProfileFile] = useState(null);
   const [profilePreview, setProfilePreview] = useState("");
 
+  // تعديل: إضافة state للمدينة والإيميل
+  const [city, setCity] = useState("");
+  const [email, setEmail] = useState("");
+
   const [position, setPosition] = useState(null);
   const [locationText, setLocationText] = useState("");
   const [skills, setSkills] = useState([]);
@@ -44,10 +50,11 @@ const VolunteerProfile = () => {
         return;
       }
 
+      // تعديل: جلب city و email مع باقي الحقول
       const { data: userRow, error: userError } = await supabase
         .from("users")
         .select(
-          "id, name, phone, gender, date_of_birth, nationality, marital_status, education, profile_image, latitude, longitude, location_text, user_type",
+          "id, name, phone, gender, date_of_birth, nationality, marital_status, education, profile_image, latitude, longitude, location_text, user_type, city, email",
         )
         .eq("email", authData.user.email)
         .eq("user_type", "volunteer")
@@ -70,6 +77,10 @@ const VolunteerProfile = () => {
       setProfileImage(userRow.profile_image || "");
       setProfilePreview(userRow.profile_image || "");
       setLocationText(userRow.location_text || "");
+
+      // تعديل: تعبئة المدينة والإيميل
+      setCity(userRow.city || "");
+      setEmail(userRow.email || authData.user.email || "");
 
       if (userRow.latitude != null && userRow.longitude != null) {
         setPosition({
@@ -156,6 +167,8 @@ const VolunteerProfile = () => {
       imageUrl = await uploadAvatar();
     }
 
+    // تعديل: حفظ city بشكل صحيح (كان الخطأ: user.city غير معرّف)
+    // ملاحظة: الإيميل للعرض فقط ولا يُحدَّث هنا
     const { error: userError } = await supabase
       .from("users")
       .update({
@@ -170,10 +183,12 @@ const VolunteerProfile = () => {
         location_text: locationText || null,
         latitude: position?.lat ?? null,
         longitude: position?.lng ?? null,
+        city: city || null, // تعديل: حفظ المدينة
       })
       .eq("id", userId);
 
     if (userError) {
+      console.error(userError);
       setSaving(false);
       setError("تعذر تحديث البيانات الشخصية");
       return;
@@ -198,6 +213,11 @@ const VolunteerProfile = () => {
     setProfileImage(imageUrl || "");
     setSaving(false);
     setMessage("تم حفظ التعديلات بنجاح");
+
+    // تعديل: الانتقال تلقائياً لصفحة عرض البروفايل بعد الحفظ
+    setTimeout(() => {
+      navigate("/volunteer/profile");
+    }, 800);
   };
 
   if (loading) {
@@ -218,12 +238,13 @@ const VolunteerProfile = () => {
     >
       <header className='bg-white/90 backdrop-blur border-b border-teal-100 sticky top-0 z-40'>
         <div className='max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between'>
+          {/* تعديل: الرجوع لصفحة العرض وليس الداشبورد فقط */}
           <Link
-            to='/volunteer/dashboard'
+            to='/volunteer/profile'
             className='inline-flex items-center gap-2 text-slate-600 hover:text-teal-700 text-sm font-medium'
           >
             <ArrowRight size={18} />
-            العودة للوحة التحكم
+            العودة للملف الشخصي
           </Link>
           <span className='text-lg font-bold text-teal-800'>
             Easy<span className='text-teal-500'>Move</span>
@@ -236,7 +257,7 @@ const VolunteerProfile = () => {
           <div className='inline-flex items-center gap-2 bg-teal-100 text-teal-800 text-xs font-semibold px-3 py-1 rounded-full mb-3'>
             حساب المتطوع
           </div>
-          <h1 className='text-3xl font-bold text-slate-900'>الملف الشخصي</h1>
+          <h1 className='text-3xl font-bold text-slate-900'>تعديل البيانات</h1>
           <p className='text-slate-500 text-sm mt-1'>
             حدّث بياناتك ومهاراتك وأيام تفرّغك
           </p>
@@ -246,7 +267,6 @@ const VolunteerProfile = () => {
           onSubmit={handleSave}
           className='bg-white/90 backdrop-blur border border-teal-100 shadow-xl shadow-teal-700/5 rounded-3xl p-6 md:p-8 space-y-6'
         >
-          {/* الصورة */}
           <div className='flex items-center gap-4'>
             <div className='w-20 h-20 rounded-full bg-stone-100 border overflow-hidden flex items-center justify-center'>
               {profilePreview ? (
@@ -283,6 +303,22 @@ const VolunteerProfile = () => {
               />
             </div>
 
+            {/* تعديل: حقل الإيميل (للعرض فقط - غير قابل للتعديل) */}
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                البريد الإلكتروني
+              </label>
+              <input
+                value={email}
+                disabled
+                className='w-full px-4 py-3 rounded-xl border border-stone-200 bg-stone-100 text-slate-500 outline-none'
+                dir='ltr'
+              />
+              <p className='text-xs text-slate-400 mt-1'>
+                لا يمكن تعديل البريد
+              </p>
+            </div>
+
             <div>
               <label className='block text-sm font-medium text-slate-700 mb-2'>
                 رقم الجوال
@@ -295,6 +331,25 @@ const VolunteerProfile = () => {
                 className='w-full px-4 py-3 rounded-xl border border-stone-200 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20'
                 dir='ltr'
               />
+            </div>
+
+            {/* تعديل: حقل المدينة */}
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                المدينة
+              </label>
+              <select
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className='w-full px-4 py-3 rounded-xl border border-stone-200 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white'
+              >
+                <option value=''>اختاري المدينة</option>
+                {(SAUDI_CITIES || []).map((c) => (
+                  <option key={c.name || c} value={c.name || c}>
+                    {c.name || c}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -482,4 +537,4 @@ const VolunteerProfile = () => {
   );
 };
 
-export default VolunteerProfile;
+export default EditProfile;

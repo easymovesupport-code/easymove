@@ -17,8 +17,8 @@ import Chat from "./pages/volunteer/Chat";
 import DisabledChat from "./pages/disabled/Chat";
 import DisabledProfileView from "./pages/disabled/ProfileView";
 import DisabledProfileEdit from "./pages/disabled/Profile"; // الصفحة الحالية للتعديل
-import VolunteerProfileView from "./pages/volunteer/ProfileView";
-import VolunteerProfileEdit from "./pages/volunteer/VolunteerProfile";
+import ProfileView from "./pages/volunteer/ProfileView";
+import EditProfile from "./pages/volunteer/EditProfile";
 import VolunteerInfo from "./pages/disabled/VolunteerInfo";
 
 // مكوّن داخلي عشان useLocation يشتغل صح
@@ -58,11 +58,9 @@ const AppLayout = () => {
             path='/disabled/profile/edit'
             element={<DisabledProfileEdit />}
           />
-          <Route path='/volunteer/profile' element={<VolunteerProfileView />} />
-          <Route
-            path='/volunteer/profile/edit'
-            element={<VolunteerProfileEdit />}
-          />
+
+          <Route path='/volunteer/profile' element={<ProfileView />} />
+          <Route path='/volunteer/profile/edit' element={<EditProfile />} />
           <Route
             path='/disabled/volunteer-info/:requestId'
             element={<VolunteerInfo />}
