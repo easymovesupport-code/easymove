@@ -345,8 +345,8 @@ const EditProfile = () => {
               >
                 <option value=''>اختاري المدينة</option>
                 {(SAUDI_CITIES || []).map((c) => (
-                  <option key={c.name || c} value={c.name || c}>
-                    {c.name || c}
+                  <option key={c.id} value={c.id}>
+                    {c.id}
                   </option>
                 ))}
               </select>

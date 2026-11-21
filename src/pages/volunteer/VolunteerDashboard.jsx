@@ -82,9 +82,10 @@ const VolunteerDashboard = () => {
         return;
       }
 
+      // جلب بيانات المتطوع فقط (بدون join خاطئ)
       const { data: userRow, error: userError } = await supabase
         .from("users")
-        .select("id, name, email, phone, user_type")
+        .select("id, name, email, city, phone, profile_image")
         .eq("email", authData.user.email)
         .eq("user_type", "volunteer")
         .maybeSingle();
@@ -96,6 +97,8 @@ const VolunteerDashboard = () => {
       }
       setUser(userRow);
 
+      const volunteerCity = userRow.city || "";
+
       const { data: volRow } = await supabase
         .from("volunteers")
         .select("*")
@@ -105,27 +108,42 @@ const VolunteerDashboard = () => {
       const skills = volRow?.skills || [];
       const days = volRow?.availability_schedule || [];
 
+      // جلب الطلبات المعلقة مع بيانات صاحب الطلب (المدينة)
       const { data: allPending } = await supabase
         .from("help_requests")
-        .select("*")
+        .select(
+          `
+          *,
+          owner:users!help_requests_user_id_fkey ( id, name, city )
+        `,
+        )
         .eq("status", "pending")
         .order("created_at", { ascending: false });
 
+      // جلب طلبات المتطوع (مقبولة + مكتملة) مع التقييم
       const { data: mine } = await supabase
         .from("help_requests")
-        .select("*")
+        .select("*, rating, rating_comment")
         .eq("volunteer_id", userRow.id)
         .in("status", ["accepted", "completed"])
         .order("created_at", { ascending: false });
 
       setMyRequests(mine || []);
 
+      // فلترة الطلبات المناسبة: مهارة + يوم + مدينة + غير مرفوض
       const matched = (allPending || []).filter((req) => {
+        const rejected = req.rejected_volunteer_ids || [];
+        if (rejected.includes(userRow.id)) return false;
+
         const skillOk =
           skills.length === 0 ? true : skills.includes(req.help_type);
         const dayName = getDayName(req.request_date);
         const dayOk = days.length === 0 ? true : days.includes(dayName);
-        return skillOk && dayOk;
+        const ownerCity = req.owner?.city || "";
+        const cityOk =
+          !volunteerCity || !ownerCity || volunteerCity === ownerCity;
+
+        return skillOk && dayOk && cityOk;
       });
 
       setSuitableRequests(matched);
@@ -236,7 +254,7 @@ const VolunteerDashboard = () => {
               أهلاً، {user?.name}
             </h1>
             <p className='text-teal-50/90 text-sm max-w-2xl'>
-              هنا تظهر لك الطلبات المناسبة حسب مهاراتك وأيام تفرّغك.
+              هنا تظهر لك الطلبات المناسبة حسب مهاراتك وأيام تفرّغك ومدينتك.
             </p>
           </div>
         </section>
@@ -283,17 +301,18 @@ const VolunteerDashboard = () => {
           </div>
         </section>
 
+        {/* الطلبات المناسبة */}
         <section className='bg-white/90 border border-teal-100 rounded-3xl overflow-hidden shadow-sm'>
           <div className='px-6 py-4 border-b border-teal-50 flex items-center justify-between bg-gradient-to-l from-teal-50/50 to-transparent'>
             <h2 className='font-bold text-slate-900'>طلبات مناسبة لك</h2>
             <span className='text-xs text-teal-700 bg-teal-50 border border-teal-100 px-2.5 py-1 rounded-full'>
-              حسب المهارات وأيام التوفر
+              حسب المهارات وأيام التوفر والمدينة
             </span>
           </div>
 
           {suitableRequests.length === 0 ? (
             <div className='p-8 text-center text-slate-500 text-sm'>
-              لا توجد طلبات مطابقة لمهاراتك وأيامك حالياً.
+              لا توجد طلبات مطابقة لمهاراتك وأيامك ومدينتك حالياً.
             </div>
           ) : (
             <div className='divide-y divide-stone-100'>
@@ -306,6 +325,8 @@ const VolunteerDashboard = () => {
                     <p className='font-bold text-slate-900 mb-1'>{req.title}</p>
                     <p className='text-sm text-slate-500 mb-2'>
                       النوع: {req.help_type}
+                      {req.owner?.name ? ` • ${req.owner.name}` : ""}
+                      {req.owner?.city ? ` • ${req.owner.city}` : ""}
                     </p>
 
                     <div className='flex flex-wrap gap-2 text-xs'>
@@ -334,6 +355,7 @@ const VolunteerDashboard = () => {
           )}
         </section>
 
+        {/* طلباتي الحالية */}
         <section className='bg-white/90 border border-teal-100 rounded-3xl overflow-hidden shadow-sm'>
           <div className='px-6 py-4 border-b border-teal-50 bg-gradient-to-l from-cyan-50/50 to-transparent'>
             <h2 className='font-bold text-slate-900'>طلباتي الحالية</h2>
@@ -350,12 +372,41 @@ const VolunteerDashboard = () => {
                   key={req.id}
                   className='px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4'
                 >
-                  <div>
+                  <div className='min-w-0 flex-1'>
                     <p className='font-bold text-slate-900 mb-1'>{req.title}</p>
                     <p className='text-sm text-slate-500'>
                       {req.help_type} • {formatDate(req.request_date)} •{" "}
                       {formatTime(req.request_time)}
                     </p>
+
+                    {/* عرض التقييم للطلبات المكتملة */}
+                    {req.status === "completed" && (
+                      <div className='mt-2 text-sm'>
+                        {req.rating ? (
+                          <div className='flex flex-col gap-1'>
+                            <div className='flex items-center gap-1 text-amber-500'>
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <span key={i}>
+                                  {i < req.rating ? "★" : "☆"}
+                                </span>
+                              ))}
+                              <span className='text-slate-600 text-xs ms-1'>
+                                ({req.rating}/5)
+                              </span>
+                            </div>
+                            {req.rating_comment && (
+                              <p className='text-xs text-slate-500 bg-stone-50 border border-stone-100 rounded-lg px-2 py-1.5'>
+                                {req.rating_comment}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className='text-xs text-slate-400'>
+                            لا يوجد تقييم بعد
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className='flex flex-wrap items-center gap-2'>
