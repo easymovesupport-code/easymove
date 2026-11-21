@@ -1,66 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
-import {
-  Bell,
-  CalendarDays,
-  CheckCircle2,
-  ClipboardList,
-  HandHeart,
-  LogOut,
-  MessageCircle,
-  UserRound,
-} from "lucide-react";
-
-const DAY_NAMES = [
-  "الأحد",
-  "الإثنين",
-  "الثلاثاء",
-  "الأربعاء",
-  "الخميس",
-  "الجمعة",
-  "السبت",
-];
-
-const statusLabel = {
-  pending: "قيد الانتظار",
-  accepted: "مقبول",
-  completed: "مكتمل",
-  cancelled: "ملغي",
-};
-
-const statusStyle = {
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  accepted: "bg-teal-50 text-teal-700 border-teal-200",
-  completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  cancelled: "bg-stone-100 text-slate-500 border-stone-200",
-};
-
-const formatTime = (time) => {
-  if (!time) return "—";
-  const [hoursStr, minutesStr = "00"] = String(time).split(":");
-  let hours = Number(hoursStr);
-  const minutes = minutesStr.padStart(2, "0");
-  if (Number.isNaN(hours)) return "—";
-  const period = hours >= 12 ? "م" : "ص";
-  hours = hours % 12;
-  if (hours === 0) hours = 12;
-  return `${hours}:${minutes} ${period}`;
-};
-
-const formatDate = (date) => {
-  if (!date) return "—";
-  return new Date(date).toLocaleDateString("ar-SA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-};
-
-const getDayName = (date) => {
-  if (!date) return null;
-  return DAY_NAMES[new Date(date).getDay()];
-};
+import { Hourglass, CheckCircle2, Star } from "lucide-react";
+import VolunteerHeader from "../../components/volunteer/VolunteerHeader";
+import StatsCards from "../../components/volunteer/StatsCards";
+import RequestsSection from "../../components/volunteer/RequestsSection";
+import { getDayName } from "../../utils/volunteerHelpers";
 
 const VolunteerDashboard = () => {
   const navigate = useNavigate();
@@ -70,6 +15,9 @@ const VolunteerDashboard = () => {
   const [suitableRequests, setSuitableRequests] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [actionLoading, setActionLoading] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [unreadMap, setUnreadMap] = useState({}); // { requestId: true }
 
   useEffect(() => {
     const load = async () => {
@@ -82,7 +30,6 @@ const VolunteerDashboard = () => {
         return;
       }
 
-      // جلب بيانات المتطوع فقط (بدون join خاطئ)
       const { data: userRow, error: userError } = await supabase
         .from("users")
         .select("id, name, email, city, phone, profile_image")
@@ -108,19 +55,12 @@ const VolunteerDashboard = () => {
       const skills = volRow?.skills || [];
       const days = volRow?.availability_schedule || [];
 
-      // جلب الطلبات المعلقة مع بيانات صاحب الطلب (المدينة)
       const { data: allPending } = await supabase
         .from("help_requests")
-        .select(
-          `
-          *,
-          owner:users!help_requests_user_id_fkey ( id, name, city )
-        `,
-        )
+        .select(`*, owner:users!help_requests_user_id_fkey ( id, name, city )`)
         .eq("status", "pending")
         .order("created_at", { ascending: false });
 
-      // جلب طلبات المتطوع (مقبولة + مكتملة) مع التقييم
       const { data: mine } = await supabase
         .from("help_requests")
         .select("*, rating, rating_comment")
@@ -128,13 +68,13 @@ const VolunteerDashboard = () => {
         .in("status", ["accepted", "completed"])
         .order("created_at", { ascending: false });
 
-      setMyRequests(mine || []);
+      const myList = mine || [];
+      setMyRequests(myList);
 
-      // فلترة الطلبات المناسبة: مهارة + يوم + مدينة + غير مرفوض
+      // فلترة الطلبات المناسبة
       const matched = (allPending || []).filter((req) => {
         const rejected = req.rejected_volunteer_ids || [];
         if (rejected.includes(userRow.id)) return false;
-
         const skillOk =
           skills.length === 0 ? true : skills.includes(req.help_type);
         const dayName = getDayName(req.request_date);
@@ -142,24 +82,111 @@ const VolunteerDashboard = () => {
         const ownerCity = req.owner?.city || "";
         const cityOk =
           !volunteerCity || !ownerCity || volunteerCity === ownerCity;
-
         return skillOk && dayOk && cityOk;
       });
-
       setSuitableRequests(matched);
+
+      // ---- الرسائل الجديدة + الإشعارات ----
+      const activeIds = myList
+        .filter((r) => r.status === "accepted")
+        .map((r) => r.id);
+
+      const notifs = [];
+      const unread = {};
+
+      // إشعار: طلب مقبول (موجود أصلاً في myList)
+      myList
+        .filter((r) => r.status === "accepted")
+        .forEach((r) => {
+          notifs.push({
+            id: `accepted-${r.id}`,
+            title: "طلب قيد التنفيذ",
+            body: r.title,
+            time: r.created_at,
+            link: `/volunteer/request/${r.id}`,
+          });
+        });
+
+      // إشعار: تقييم جديد على طلب مكتمل
+      myList
+        .filter((r) => r.status === "completed" && r.rating)
+        .forEach((r) => {
+          notifs.push({
+            id: `rating-${r.id}`,
+            title: "تقييم جديد",
+            body: `حصلت على ${r.rating}/5 على طلب: ${r.title}`,
+            time: r.created_at,
+            link: `/volunteer/dashboard`,
+          });
+        });
+
+      if (activeIds.length > 0) {
+        const { data: msgs } = await supabase
+          .from("messages")
+          .select("id, request_id, sender_id, body, created_at")
+          .in("request_id", activeIds)
+          .neq("sender_id", userRow.id)
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        (msgs || []).forEach((m) => {
+          // هل الرسالة أحدث من آخر مشاهدة؟
+          const seenKey = `chat_seen_${m.request_id}`;
+          const lastSeen = localStorage.getItem(seenKey);
+          const isNew =
+            !lastSeen || new Date(m.created_at) > new Date(lastSeen);
+
+          if (isNew) {
+            unread[m.request_id] = true;
+            notifs.push({
+              id: `msg-${m.id}`,
+              title: "رسالة جديدة",
+              body: m.body?.slice(0, 60) || "رسالة جديدة من صاحب الطلب",
+              time: m.created_at,
+              link: `/volunteer/chat/${m.request_id}`,
+            });
+          }
+        });
+      }
+
+      // ترتيب الإشعارات من الأحدث
+      notifs.sort((a, b) => new Date(b.time) - new Date(a.time));
+      setNotifications(notifs.slice(0, 15));
+      setUnreadMap(unread);
+
       setLoading(false);
     };
 
     load();
   }, [navigate]);
 
+  const activeRequests = useMemo(
+    () => myRequests.filter((r) => r.status === "accepted"),
+    [myRequests],
+  );
+
+  const completedRequests = useMemo(
+    () => myRequests.filter((r) => r.status === "completed"),
+    [myRequests],
+  );
+
   const stats = useMemo(() => {
+    const ratings = completedRequests
+      .map((r) => r.rating)
+      .filter((r) => typeof r === "number" && r >= 1 && r <= 5);
+    const avgRating =
+      ratings.length > 0
+        ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
+        : null;
+
     return {
       suitable: suitableRequests.length,
-      active: myRequests.filter((r) => r.status === "accepted").length,
-      completed: myRequests.filter((r) => r.status === "completed").length,
+      active: activeRequests.length,
+      completed: completedRequests.length,
+      avgRating,
+      ratingsCount: ratings.length,
     };
-  }, [suitableRequests, myRequests]);
+  }, [suitableRequests, activeRequests, completedRequests]);
 
   const handleComplete = async (requestId) => {
     setActionLoading(requestId);
@@ -170,12 +197,10 @@ const VolunteerDashboard = () => {
       .eq("volunteer_id", user.id);
 
     setActionLoading(null);
-
     if (updateError) {
       setError("تعذر تحديث حالة الطلب");
       return;
     }
-
     setMyRequests((prev) =>
       prev.map((r) => (r.id === requestId ? { ...r, status: "completed" } : r)),
     );
@@ -202,52 +227,17 @@ const VolunteerDashboard = () => {
       className='min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50'
       dir='rtl'
     >
-      <header className='bg-white/90 backdrop-blur border-b border-teal-100 sticky top-0 z-40'>
-        <div className='max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between'>
-          <div className='flex items-center gap-3'>
-            <div className='w-11 h-11 rounded-full bg-gradient-to-l from-teal-600 to-cyan-600 text-white flex items-center justify-center font-bold shadow-md shadow-teal-700/20'>
-              {(user?.name || "م").charAt(0)}
-            </div>
-            <div>
-              <p className='font-bold text-slate-900 text-sm'>{user?.name}</p>
-              <p className='text-xs text-teal-700'>متطوع</p>
-            </div>
-          </div>
-
-          <div className='flex items-center gap-2'>
-            <Link
-              to='/volunteer/profile'
-              className='p-2 rounded-xl hover:bg-teal-50 text-slate-600 hover:text-teal-700 transition-colors'
-              title='الملف الشخصي'
-            >
-              <UserRound size={20} />
-            </Link>
-            <button
-              type='button'
-              className='relative p-2 rounded-xl hover:bg-teal-50 text-slate-600'
-              title='الإشعارات'
-            >
-              <Bell size={20} />
-            </button>
-            <button
-              type='button'
-              onClick={handleLogout}
-              className='p-2 rounded-xl hover:bg-red-50 text-slate-600 hover:text-red-600 transition-colors'
-              title='تسجيل الخروج'
-            >
-              <LogOut size={20} />
-            </button>
-            <Link to='/' className='text-lg font-bold text-teal-800 ms-2'>
-              Easy<span className='text-teal-500'>Move</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <VolunteerHeader
+        user={user}
+        onLogout={handleLogout}
+        notifications={notifications}
+        notifOpen={notifOpen}
+        setNotifOpen={setNotifOpen}
+      />
 
       <main className='max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8'>
         <section className='relative overflow-hidden bg-gradient-to-l from-teal-600 via-teal-700 to-cyan-700 text-white rounded-3xl p-6 md:p-8 shadow-xl shadow-teal-700/20'>
-          <div className='absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl'></div>
-          <div className='absolute -bottom-12 -right-12 w-48 h-48 bg-cyan-300/20 rounded-full blur-2xl'></div>
+          <div className='absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl' />
           <div className='relative'>
             <p className='text-teal-100 text-sm mb-1'>مرحباً بك</p>
             <h1 className='text-2xl md:text-3xl font-bold mb-2'>
@@ -264,186 +254,38 @@ const VolunteerDashboard = () => {
             {error}
           </div>
         )}
-
-        <section className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-          <div className='bg-white/90 border border-teal-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow'>
-            <div className='flex items-center justify-between mb-3'>
-              <span className='text-sm text-slate-500'>طلبات مناسبة</span>
-              <div className='w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center'>
-                <ClipboardList size={18} />
-              </div>
-            </div>
-            <p className='text-3xl font-bold text-slate-900'>
-              {stats.suitable}
-            </p>
-          </div>
-
-          <div className='bg-white/90 border border-amber-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow'>
-            <div className='flex items-center justify-between mb-3'>
-              <span className='text-sm text-slate-500'>قيد التنفيذ</span>
-              <div className='w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center'>
-                <HandHeart size={18} />
-              </div>
-            </div>
-            <p className='text-3xl font-bold text-slate-900'>{stats.active}</p>
-          </div>
-
-          <div className='bg-white/90 border border-emerald-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow'>
-            <div className='flex items-center justify-between mb-3'>
-              <span className='text-sm text-slate-500'>مكتملة</span>
-              <div className='w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center'>
-                <CheckCircle2 size={18} />
-              </div>
-            </div>
-            <p className='text-3xl font-bold text-slate-900'>
-              {stats.completed}
-            </p>
-          </div>
-        </section>
-
-        {/* الطلبات المناسبة */}
-        <section className='bg-white/90 border border-teal-100 rounded-3xl overflow-hidden shadow-sm'>
-          <div className='px-6 py-4 border-b border-teal-50 flex items-center justify-between bg-gradient-to-l from-teal-50/50 to-transparent'>
-            <h2 className='font-bold text-slate-900'>طلبات مناسبة لك</h2>
-            <span className='text-xs text-teal-700 bg-teal-50 border border-teal-100 px-2.5 py-1 rounded-full'>
-              حسب المهارات وأيام التوفر والمدينة
-            </span>
-          </div>
-
-          {suitableRequests.length === 0 ? (
-            <div className='p-8 text-center text-slate-500 text-sm'>
-              لا توجد طلبات مطابقة لمهاراتك وأيامك ومدينتك حالياً.
-            </div>
-          ) : (
-            <div className='divide-y divide-stone-100'>
-              {suitableRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className='px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 hover:bg-teal-50/30 transition-colors'
-                >
-                  <div>
-                    <p className='font-bold text-slate-900 mb-1'>{req.title}</p>
-                    <p className='text-sm text-slate-500 mb-2'>
-                      النوع: {req.help_type}
-                      {req.owner?.name ? ` • ${req.owner.name}` : ""}
-                      {req.owner?.city ? ` • ${req.owner.city}` : ""}
-                    </p>
-
-                    <div className='flex flex-wrap gap-2 text-xs'>
-                      <span className='inline-flex items-center gap-1 bg-teal-50 text-teal-800 border border-teal-200 font-semibold px-2.5 py-1 rounded-lg'>
-                        <CalendarDays size={12} />
-                        {getDayName(req.request_date)}
-                      </span>
-                      <span className='bg-cyan-50 text-cyan-800 border border-cyan-200 font-semibold px-2.5 py-1 rounded-lg'>
-                        {formatDate(req.request_date)}
-                      </span>
-                      <span className='bg-white border border-stone-200 px-2.5 py-1 rounded-lg'>
-                        الوقت: {formatTime(req.request_time)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <Link
-                    to={`/volunteer/request/${req.id}`}
-                    className='shrink-0 bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-teal-700/20 transition-all text-center'
-                  >
-                    عرض التفاصيل
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
+        {/* الاحصائيات */}
+        <StatsCards stats={stats} />
+        {/* طلبات مناسبة لك */}
+        <RequestsSection
+          title='طلبات مناسبة لك'
+          subtitle='حسب المهارات وأيام التوفر والمدينة'
+          icon={Hourglass}
+          type='suitable'
+          requests={suitableRequests}
+          emptyText='لا توجد طلبات مطابقة لمهاراتك وأيامك ومدينتك حالياً.'
+        />
         {/* طلباتي الحالية */}
-        <section className='bg-white/90 border border-teal-100 rounded-3xl overflow-hidden shadow-sm'>
-          <div className='px-6 py-4 border-b border-teal-50 bg-gradient-to-l from-cyan-50/50 to-transparent'>
-            <h2 className='font-bold text-slate-900'>طلباتي الحالية</h2>
-          </div>
-
-          {myRequests.length === 0 ? (
-            <div className='p-8 text-center text-slate-500 text-sm'>
-              لم تقبل أي طلب بعد.
-            </div>
-          ) : (
-            <div className='divide-y divide-stone-100'>
-              {myRequests.map((req) => (
-                <div
-                  key={req.id}
-                  className='px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4'
-                >
-                  <div className='min-w-0 flex-1'>
-                    <p className='font-bold text-slate-900 mb-1'>{req.title}</p>
-                    <p className='text-sm text-slate-500'>
-                      {req.help_type} • {formatDate(req.request_date)} •{" "}
-                      {formatTime(req.request_time)}
-                    </p>
-
-                    {/* عرض التقييم للطلبات المكتملة */}
-                    {req.status === "completed" && (
-                      <div className='mt-2 text-sm'>
-                        {req.rating ? (
-                          <div className='flex flex-col gap-1'>
-                            <div className='flex items-center gap-1 text-amber-500'>
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <span key={i}>
-                                  {i < req.rating ? "★" : "☆"}
-                                </span>
-                              ))}
-                              <span className='text-slate-600 text-xs ms-1'>
-                                ({req.rating}/5)
-                              </span>
-                            </div>
-                            {req.rating_comment && (
-                              <p className='text-xs text-slate-500 bg-stone-50 border border-stone-100 rounded-lg px-2 py-1.5'>
-                                {req.rating_comment}
-                              </p>
-                            )}
-                          </div>
-                        ) : (
-                          <p className='text-xs text-slate-400'>
-                            لا يوجد تقييم بعد
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className='flex flex-wrap items-center gap-2'>
-                    <span
-                      className={`text-xs font-semibold px-3 py-1.5 rounded-full border ${
-                        statusStyle[req.status] || statusStyle.pending
-                      }`}
-                    >
-                      {statusLabel[req.status] || req.status}
-                    </span>
-
-                    {req.status === "accepted" && (
-                      <div className='flex flex-wrap items-center gap-2'>
-                        <Link
-                          to={`/volunteer/chat/${req.id}`}
-                          className='inline-flex items-center gap-2 bg-gradient-to-l from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md shadow-teal-700/20 transition-all'
-                        >
-                          <MessageCircle size={16} />
-                          محادثة
-                        </Link>
-
-                        <button
-                          type='button'
-                          disabled={actionLoading === req.id}
-                          onClick={() => handleComplete(req.id)}
-                          className='inline-flex items-center gap-2 bg-gradient-to-l from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-md shadow-emerald-700/20 transition-all'
-                        >
-                          إكمال الطلب
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        <RequestsSection
+          title='طلباتي الحالية'
+          subtitle='مقبولة وجاهزة للمتابعة'
+          icon={CheckCircle2}
+          type='active'
+          requests={activeRequests}
+          emptyText='لا توجد طلبات قيد التنفيذ حالياً.'
+          actionLoading={actionLoading}
+          onComplete={handleComplete}
+          unreadMap={unreadMap}
+        />
+        {/* الطلبات المكتملة */}
+        <RequestsSection
+          title='الطلبات المكتملة'
+          subtitle='مع التقييمات'
+          icon={Star}
+          type='completed'
+          requests={completedRequests}
+          emptyText='لا توجد طلبات مكتملة بعد.'
+        />
       </main>
     </div>
   );
