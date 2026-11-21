@@ -209,17 +209,48 @@ export const useDisabledDashboard = () => {
 
     setActionLoading(requestId);
 
-    const { error } = await supabase
+    // جلب المستخدم مباشرة من Auth (لا نعتمد على state)
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user) {
+      setActionLoading(null);
+      alert("انتهت الجلسة. سجّلي الدخول مجدداً.");
+      navigate("/login?type=disabled");
+      return;
+    }
+
+    const { data: userRow } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", authData.user.email)
+      .eq("user_type", "disabled")
+      .maybeSingle();
+
+    if (!userRow) {
+      setActionLoading(null);
+      alert("تعذر التحقق من المستخدم");
+      return;
+    }
+
+    const { data, error } = await supabase
       .from("help_requests")
       .delete()
       .eq("id", requestId)
-      .eq("user_id", userId)
-      .eq("status", "pending");
+      .eq("user_id", userRow.id)
+      .eq("status", "pending")
+      .select(); // مهم: لمعرفة هل تم حذف صف فعلاً
 
     setActionLoading(null);
 
     if (error) {
-      alert("تعذر إلغاء الطلب");
+      console.error(error);
+      alert("تعذر إلغاء الطلب: " + error.message);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      alert(
+        "لم يتم العثور على الطلب أو لا يمكن حذفه (قد لا يكون قيد الانتظار).",
+      );
       return;
     }
 
