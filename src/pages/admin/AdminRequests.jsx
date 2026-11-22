@@ -185,45 +185,43 @@ const AdminRequests = () => {
           <div className='overflow-x-auto'>
             <table className='w-full text-sm'>
               <thead>
-                <tr className='bg-stone-50 text-slate-500 text-xs'>
-                  <th className='text-right px-4 py-3 font-semibold'>الطلب</th>
-                  <th className='text-right px-4 py-3 font-semibold'>
-                    المستفيد
-                  </th>
-                  <th className='text-right px-4 py-3 font-semibold'>
-                    المتطوع
-                  </th>
-                  <th className='text-right px-4 py-3 font-semibold'>النوع</th>
-                  <th className='text-right px-4 py-3 font-semibold'>
-                    المدينة
-                  </th>
-                  <th className='text-right px-4 py-3 font-semibold'>الحالة</th>
-                  <th className='text-right px-4 py-3 font-semibold'>
-                    التقييم
-                  </th>
+                <tr className='bg-slate-800 text-white text-xs'>
+                  <th className='text-right px-4 py-3.5 font-bold w-14'>#</th>
+                  <th className='text-right px-4 py-3.5 font-bold'>الطلب</th>
+                  <th className='text-right px-4 py-3.5 font-bold'>المستفيد</th>
+                  <th className='text-right px-4 py-3.5 font-bold'>المتطوع</th>
+                  <th className='text-right px-4 py-3.5 font-bold'>النوع</th>
+                  <th className='text-right px-4 py-3.5 font-bold'>المدينة</th>
+                  <th className='text-right px-4 py-3.5 font-bold'>الحالة</th>
+                  <th className='text-right px-4 py-3.5 font-bold'>التقييم</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-stone-100'>
-                {filtered.map((r) => (
+                {filtered.map((r, index) => (
                   <tr key={r.id} className='hover:bg-stone-50/80'>
-                    <td className='px-4 py-3'>
+                    <td className='px-4 py-3 text-right text-slate-500 font-semibold'>
+                      {index + 1}
+                    </td>
+                    <td className='px-4 py-3 text-right'>
                       <p className='font-semibold text-slate-900'>{r.title}</p>
                       <p className='text-[11px] text-slate-400'>
                         {r.request_date ||
                           new Date(r.created_at).toLocaleDateString("ar-SA")}
                       </p>
                     </td>
-                    <td className='px-4 py-3 text-slate-700'>
+                    <td className='px-4 py-3 text-right text-slate-700'>
                       {r.owner?.name || "—"}
                     </td>
-                    <td className='px-4 py-3 text-slate-700'>
+                    <td className='px-4 py-3 text-right text-slate-700'>
                       {r.volunteer?.name || "—"}
                     </td>
-                    <td className='px-4 py-3 text-slate-600'>{r.help_type}</td>
-                    <td className='px-4 py-3 text-slate-600'>
+                    <td className='px-4 py-3 text-right text-slate-600'>
+                      {r.help_type}
+                    </td>
+                    <td className='px-4 py-3 text-right text-slate-600'>
                       {r.owner?.city || "—"}
                     </td>
-                    <td className='px-4 py-3'>
+                    <td className='px-4 py-3 text-right'>
                       <span
                         className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${
                           statusColor[r.status] || statusColor.pending
@@ -232,7 +230,7 @@ const AdminRequests = () => {
                         {statusLabel[r.status] || r.status}
                       </span>
                     </td>
-                    <td className='px-4 py-3'>
+                    <td className='px-4 py-3 text-right'>
                       {r.rating ? (
                         <span className='inline-flex items-center gap-1 text-amber-600 font-semibold'>
                           <Star

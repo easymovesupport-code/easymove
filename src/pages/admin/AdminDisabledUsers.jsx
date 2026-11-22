@@ -233,6 +233,7 @@ const AdminDisabledUsers = () => {
               {/* رأس أوضح */}
               <thead>
                 <tr className='bg-slate-800 text-white text-xs'>
+                  <th className='text-right px-4 py-3.5 font-bold w-14'>#</th>
                   <th className='text-right px-4 py-3.5 font-bold'>الاسم</th>
                   <th className='text-right px-4 py-3.5 font-bold'>الهوية</th>
                   <th className='text-right px-4 py-3.5 font-bold'>الجوال</th>
@@ -243,8 +244,11 @@ const AdminDisabledUsers = () => {
                 </tr>
               </thead>
               <tbody className='divide-y divide-stone-100'>
-                {filtered.map((u) => (
+                {filtered.map((u, index) => (
                   <tr key={u.id} className='hover:bg-stone-50/80'>
+                    <td className='px-4 py-3 text-right text-slate-500 font-semibold'>
+                      {index + 1}
+                    </td>
                     <td className='px-4 py-3 font-semibold text-slate-900'>
                       {u.name}
                     </td>
