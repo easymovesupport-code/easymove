@@ -8,6 +8,7 @@ import {
   X,
   HeartHandshake,
   Save,
+  Printer,
 } from "lucide-react";
 import { SKILLS, DAYS } from "../../constants/registerConstants";
 import { SAUDI_CITIES } from "../../constants/cities";
@@ -288,8 +289,8 @@ const AdminVolunteers = () => {
       </div>
 
       <div className='bg-white/95 rounded-2xl border border-white/20 shadow-lg overflow-hidden'>
-        <div className='p-4 border-b border-stone-100'>
-          <div className='relative max-w-md'>
+        <div className='p-4 border-b border-stone-100 flex flex-wrap items-center justify-between gap-3 print:hidden'>
+          <div className='relative max-w-md flex-1'>
             <Search
               size={16}
               className='absolute right-3 top-1/2 -translate-y-1/2 text-slate-400'
@@ -301,6 +302,14 @@ const AdminVolunteers = () => {
               className='w-full pr-10 pl-4 py-2.5 rounded-xl border border-stone-200 text-sm outline-none focus:border-teal-500'
             />
           </div>
+          <button
+            type='button'
+            onClick={() => window.print()}
+            className='inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl'
+          >
+            <Printer size={16} />
+            طباعة التقرير
+          </button>
         </div>
 
         {loading ? (
@@ -609,6 +618,129 @@ const AdminVolunteers = () => {
           </div>
         </div>
       )}
+      <div id='print-report' className='hidden print:block'>
+        <div className='text-center mb-6'>
+          <h1 className='text-xl font-bold text-slate-900'>تقرير المتطوعين</h1>
+          <p className='text-sm text-slate-500 mt-1'>
+            EasyMove — {new Date().toLocaleDateString("ar-SA")}
+          </p>
+          <p className='text-sm text-slate-500'>
+            عدد السجلات: {filtered.length}
+          </p>
+        </div>
+
+        <div className='space-y-4'>
+          {filtered.map((u, index) => (
+            <div
+              key={u.id}
+              className='border border-stone-300 rounded-xl p-4 break-inside-avoid mb-4'
+            >
+              {/* العنوان */}
+              <div className='flex items-center gap-2 mb-3 border-b border-stone-200 pb-2'>
+                <span className='w-7 h-7 rounded-full bg-slate-800 text-white text-xs font-bold flex items-center justify-center'>
+                  {index + 1}
+                </span>
+                <h2 className='font-bold text-slate-900 text-base'>{u.name}</h2>
+              </div>
+
+              {/* صفوف قصيرة: حقلين في كل سطر */}
+              <div className='grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-3'>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    رقم الهوية
+                  </span>
+                  <span className='font-semibold text-slate-900' dir='ltr'>
+                    {u.national_id || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    البريد
+                  </span>
+                  <span className='font-semibold text-slate-900' dir='ltr'>
+                    {u.email || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    الجوال
+                  </span>
+                  <span className='font-semibold text-slate-900' dir='ltr'>
+                    {u.phone || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    المدينة
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {u.city || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    طلبات مكتملة
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {u.completed ?? 0}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    متوسط التقييم
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {u.avgRating ? `${u.avgRating}/5 (${u.ratingsCount})` : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    تاريخ التسجيل
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {u.created_at
+                      ? new Date(u.created_at).toLocaleDateString("ar-SA")
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* المهارات وأيام التوفر: كل واحد في سطر كامل */}
+              <div className='space-y-2 text-sm border-t border-stone-100 pt-3'>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    المهارات
+                  </span>
+                  <span className='font-semibold text-slate-900 leading-relaxed'>
+                    {u.skills?.length ? u.skills.join("، ") : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    أيام التوفر
+                  </span>
+                  <span className='font-semibold text-slate-900 leading-relaxed'>
+                    {u.days?.length ? u.days.join("، ") : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+  @media print {
+    body * { visibility: hidden; }
+    #print-report, #print-report * { visibility: visible; }
+    #print-report {
+      position: absolute;
+      inset: 0;
+      padding: 16px;
+      background: white;
+    }
+  }
+`}</style>
     </div>
   );
 };

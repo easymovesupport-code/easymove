@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { Search, Trash2, Eye, Pencil, X, Users, Save } from "lucide-react";
+import {
+  Search,
+  Trash2,
+  Eye,
+  Pencil,
+  X,
+  Users,
+  Save,
+  Printer,
+} from "lucide-react";
 
 const AdminDisabledUsers = () => {
   const [loading, setLoading] = useState(true);
@@ -201,8 +210,8 @@ const AdminDisabledUsers = () => {
       </div>
 
       <div className='bg-white/95 rounded-2xl border border-white/20 shadow-lg overflow-hidden'>
-        <div className='p-4 border-b border-stone-100'>
-          <div className='relative max-w-md'>
+        <div className='p-4 border-b border-stone-100 flex flex-wrap items-center justify-between gap-3 print:hidden'>
+          <div className='relative max-w-md flex-1'>
             <Search
               size={16}
               className='absolute right-3 top-1/2 -translate-y-1/2 text-slate-400'
@@ -210,12 +219,19 @@ const AdminDisabledUsers = () => {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder='بحث بالاسم أو الهوية أو المدينة...'
+              placeholder='بحث بالاسم أو رقم الهوية أو المدينة...'
               className='w-full pr-10 pl-4 py-2.5 rounded-xl border border-stone-200 text-sm outline-none focus:border-teal-500'
             />
           </div>
+          <button
+            type='button'
+            onClick={() => window.print()}
+            className='inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl'
+          >
+            <Printer size={16} />
+            طباعة التقرير
+          </button>
         </div>
-
         {loading ? (
           <p className='p-8 text-center text-slate-400 text-sm'>
             جاري التحميل...
@@ -473,6 +489,101 @@ const AdminDisabledUsers = () => {
           </div>
         </div>
       )}
+      {/* تقرير الطباعة — يظهر عند الطباعة فقط */}
+      <div id='print-report' className='hidden print:block'>
+        <div className='text-center mb-6'>
+          <h1 className='text-xl font-bold text-slate-900'>
+            تقرير ذوي الإعاقة
+          </h1>
+          <p className='text-sm text-slate-500 mt-1'>
+            EasyMove — {new Date().toLocaleDateString("ar-SA")}
+          </p>
+          <p className='text-sm text-slate-500'>
+            عدد السجلات: {filtered.length}
+          </p>
+        </div>
+
+        <div className='space-y-4'>
+          {filtered.map((u, index) => (
+            <div
+              key={u.id}
+              className='border border-stone-300 rounded-xl p-4 break-inside-avoid'
+            >
+              <div className='flex items-center gap-2 mb-3 border-b border-stone-200 pb-2'>
+                <span className='w-7 h-7 rounded-full bg-slate-800 text-white text-xs font-bold flex items-center justify-center'>
+                  {index + 1}
+                </span>
+                <h2 className='font-bold text-slate-900 text-base'>{u.name}</h2>
+              </div>
+              <div className='grid grid-cols-2 gap-x-6 gap-y-2 text-sm'>
+                <div className='flex justify-between gap-2'>
+                  <span className='text-slate-500'>رقم الهوية</span>
+                  <span className='font-semibold' dir='ltr'>
+                    {u.national_id || "—"}
+                  </span>
+                </div>
+                <div className='flex justify-between gap-2'>
+                  <span className='text-slate-500'>البريد</span>
+                  <span className='font-semibold' dir='ltr'>
+                    {u.email || "—"}
+                  </span>
+                </div>
+                <div className='flex justify-between gap-2'>
+                  <span className='text-slate-500'>الجوال</span>
+                  <span className='font-semibold' dir='ltr'>
+                    {u.phone || "—"}
+                  </span>
+                </div>
+                <div className='flex justify-between gap-2'>
+                  <span className='text-slate-500'>المدينة</span>
+                  <span className='font-semibold'>{u.city || "—"}</span>
+                </div>
+                <div className='flex justify-between gap-2'>
+                  <span className='text-slate-500'>الجنس</span>
+                  <span className='font-semibold'>
+                    {u.gender === "male"
+                      ? "ذكر"
+                      : u.gender === "female"
+                        ? "أنثى"
+                        : "—"}
+                  </span>
+                </div>
+                <div className='flex justify-between gap-2'>
+                  <span className='text-slate-500'>العنوان</span>
+                  <span className='font-semibold'>
+                    {u.location_text || "—"}
+                  </span>
+                </div>
+                <div className='flex justify-between gap-2'>
+                  <span className='text-slate-500'>عدد الطلبات</span>
+                  <span className='font-semibold'>{u.requestsCount ?? 0}</span>
+                </div>
+                <div className='flex justify-between gap-2'>
+                  <span className='text-slate-500'>تاريخ التسجيل</span>
+                  <span className='font-semibold'>
+                    {u.created_at
+                      ? new Date(u.created_at).toLocaleDateString("ar-SA")
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+  @media print {
+    body * { visibility: hidden; }
+    #print-report, #print-report * { visibility: visible; }
+    #print-report {
+      position: absolute;
+      inset: 0;
+      padding: 16px;
+      background: white;
+    }
+  }
+`}</style>
     </div>
   );
 };

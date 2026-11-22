@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import { Search, Filter, Star } from "lucide-react";
+import { Search, Filter, Star, Printer } from "lucide-react";
 
 const STATUS_OPTIONS = [
   { id: "all", label: "الكل" },
@@ -42,13 +42,15 @@ const AdminRequests = () => {
         .from("help_requests")
         .select(
           `
-          id, title, help_type, status, request_date, created_at, rating, location,
-          owner:users!help_requests_user_id_fkey ( id, name, city ),
-          volunteer:users!help_requests_volunteer_id_fkey ( id, name )
-        `,
+    id, title, description, help_type, status,
+    request_date, request_time, time_from, time_to,
+    location, latitude, longitude,
+    rating, rating_comment, created_at,
+    owner:users!help_requests_user_id_fkey ( id, name, city, phone ),
+    volunteer:users!help_requests_volunteer_id_fkey ( id, name, phone )
+  `,
         )
         .order("created_at", { ascending: false });
-
       setRows(data || []);
       setLoading(false);
     };
@@ -117,6 +119,21 @@ const AdminRequests = () => {
                 {s.label}
               </button>
             ))}
+          </div>
+          <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden'>
+            <div>
+              <p className='text-white/50 text-sm'>
+                جميع طلبات المساعدة ({filtered.length} / {rows.length})
+              </p>
+            </div>
+            <button
+              type='button'
+              onClick={() => window.print()}
+              className='inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold px-4 py-2.5 rounded-xl'
+            >
+              <Printer size={16} />
+              طباعة التقرير
+            </button>
           </div>
 
           <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2'>
@@ -250,6 +267,182 @@ const AdminRequests = () => {
           </div>
         )}
       </div>
+      {/* تقرير الطباعة */}
+      <div id='print-report' className='hidden print:block'>
+        <div className='text-center mb-6'>
+          <h1 className='text-xl font-bold text-slate-900'>
+            تقرير طلبات المساعدة
+          </h1>
+          <p className='text-sm text-slate-500 mt-1'>
+            EasyMove — {new Date().toLocaleDateString("ar-SA")}
+          </p>
+          <p className='text-sm text-slate-500'>
+            عدد الطلبات: {filtered.length}
+            {status !== "all"
+              ? ` — الحالة: ${statusLabel[status] || status}`
+              : ""}
+            {city ? ` — المدينة: ${city}` : ""}
+          </p>
+        </div>
+
+        <div className='space-y-4'>
+          {filtered.map((r, index) => (
+            <div
+              key={r.id}
+              className='border border-stone-300 rounded-xl p-4 break-inside-avoid mb-4'
+            >
+              <div className='flex items-center justify-between gap-2 mb-3 border-b border-stone-200 pb-2'>
+                <div className='flex items-center gap-2'>
+                  <span className='w-7 h-7 rounded-full bg-slate-800 text-white text-xs font-bold flex items-center justify-center'>
+                    {index + 1}
+                  </span>
+                  <h2 className='font-bold text-slate-900 text-base'>
+                    {r.title}
+                  </h2>
+                </div>
+                <span className='text-xs font-semibold px-2.5 py-1 rounded-full border border-stone-300'>
+                  {statusLabel[r.status] || r.status}
+                </span>
+              </div>
+
+              <div className='grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-3'>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    نوع المساعدة
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {r.help_type || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    المدينة
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {r.owner?.city || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    المستفيد
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {r.owner?.name || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    جوال المستفيد
+                  </span>
+                  <span className='font-semibold text-slate-900' dir='ltr'>
+                    {r.owner?.phone || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    المتطوع
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {r.volunteer?.name || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    جوال المتطوع
+                  </span>
+                  <span className='font-semibold text-slate-900' dir='ltr'>
+                    {r.volunteer?.phone || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    تاريخ الطلب
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {r.request_date ||
+                      (r.created_at
+                        ? new Date(r.created_at).toLocaleDateString("ar-SA")
+                        : "—")}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    الوقت
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {r.request_time ||
+                      (r.time_from && r.time_to
+                        ? `${r.time_from} - ${r.time_to}`
+                        : r.time_from || "—")}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    التقييم
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {r.rating ? `${r.rating}/5` : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    تاريخ الإنشاء
+                  </span>
+                  <span className='font-semibold text-slate-900'>
+                    {r.created_at
+                      ? new Date(r.created_at).toLocaleDateString("ar-SA")
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+
+              <div className='space-y-2 text-sm border-t border-stone-100 pt-3'>
+                <div>
+                  <span className='text-slate-500 block text-xs mb-0.5'>
+                    الموقع / العنوان
+                  </span>
+                  <span className='font-semibold text-slate-900 leading-relaxed'>
+                    {r.location || "—"}
+                  </span>
+                </div>
+                {r.description && (
+                  <div>
+                    <span className='text-slate-500 block text-xs mb-0.5'>
+                      الوصف
+                    </span>
+                    <span className='font-semibold text-slate-900 leading-relaxed'>
+                      {r.description}
+                    </span>
+                  </div>
+                )}
+                {r.rating_comment && (
+                  <div>
+                    <span className='text-slate-500 block text-xs mb-0.5'>
+                      تعليق التقييم
+                    </span>
+                    <span className='font-semibold text-slate-900 leading-relaxed'>
+                      {r.rating_comment}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+  @media print {
+    body * { visibility: hidden; }
+    #print-report, #print-report * { visibility: visible; }
+    #print-report {
+      position: absolute;
+      inset: 0;
+      padding: 16px;
+      background: white;
+    }
+  }
+`}</style>
     </div>
   );
 };
