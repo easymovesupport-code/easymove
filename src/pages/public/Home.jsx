@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
+import { supabase } from "../../lib/supabase";
 import {
   UserPlus,
   HandHeart,
@@ -11,6 +12,7 @@ import {
   ArrowLeft,
   CheckCircle2,
 } from "lucide-react";
+
 const StatCard = ({ end, label, icon, barColor, delay = 0 }) => {
   const [count, setCount] = useState(0);
   const [started, setStarted] = useState(false);
@@ -33,27 +35,39 @@ const StatCard = ({ end, label, icon, barColor, delay = 0 }) => {
   useEffect(() => {
     if (!started) return;
 
-    const timeout = setTimeout(() => {
+    let timer;
+    let timeout;
+
+    // تشغيل العدّ بعد delay (حتى لو الرقم 0)
+    timeout = setTimeout(() => {
+      const target = Number(end) || 0;
+
+      if (target <= 0) {
+        setCount(0);
+        return;
+      }
+
       let current = 0;
       const duration = 1500;
       const stepTime = 16;
       const steps = duration / stepTime;
-      const increment = end / steps;
+      const increment = target / steps;
 
-      const timer = setInterval(() => {
+      timer = setInterval(() => {
         current += increment;
-        if (current >= end) {
-          setCount(end);
+        if (current >= target) {
+          setCount(target);
           clearInterval(timer);
         } else {
           setCount(Math.floor(current));
         }
       }, stepTime);
-
-      return () => clearInterval(timer);
     }, delay);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(timer);
+    };
   }, [started, end, delay]);
 
   return (
@@ -61,17 +75,15 @@ const StatCard = ({ end, label, icon, barColor, delay = 0 }) => {
       ref={ref}
       className='group flex overflow-hidden rounded-2xl bg-white border border-stone-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 cursor-default'
     >
-      {/* Colored Side */}
       <div
         className={`w-24 md:w-28 ${barColor} flex items-center justify-center text-white group-hover:scale-105 transition-transform duration-500`}
       >
         {icon}
       </div>
 
-      {/* Number Side */}
       <div className='flex-1 px-8 py-6 flex flex-col justify-center'>
         <div className='text-4xl md:text-5xl font-bold tracking-tight text-slate-900'>
-          +{count}
+          {count}+
         </div>
         <div className='text-slate-500 mt-1 text-base group-hover:text-slate-700 transition-colors'>
           {label}
@@ -81,6 +93,49 @@ const StatCard = ({ end, label, icon, barColor, delay = 0 }) => {
   );
 };
 const Home = () => {
+  const [stats, setStats] = useState({
+    users: 0,
+    volunteers: 0,
+    requests: 0,
+  });
+  const [statsLoaded, setStatsLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const [
+          { count: disabledCount },
+          { count: volunteersCount },
+          { count: requestsCount },
+        ] = await Promise.all([
+          supabase
+            .from("users")
+            .select("*", { count: "exact", head: true })
+            .eq("user_type", "disabled"),
+          supabase
+            .from("users")
+            .select("*", { count: "exact", head: true })
+            .eq("user_type", "volunteer"),
+          supabase
+            .from("help_requests")
+            .select("*", { count: "exact", head: true }),
+        ]);
+
+        setStats({
+          users: (disabledCount || 0) + (volunteersCount || 0),
+          volunteers: volunteersCount || 0,
+          requests: requestsCount || 0,
+        });
+      } catch (err) {
+        console.error("Failed to load home stats:", err);
+      } finally {
+        setStatsLoaded(true);
+      }
+    };
+
+    loadStats();
+  }, []);
+
   return (
     <div className='bg-white min-h-screen'>
       {/* Hero Section */}
@@ -127,11 +182,10 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Big Stats Section */}
+      {/* Big Stats Section — أرقام حقيقية */}
       <section className='py-24 bg-white'>
         <div className='max-w-7xl mx-auto px-6'>
           <div className='grid grid-cols-1 lg:grid-cols-2 gap-16 items-center'>
-            {/* Left - Text */}
             <div>
               <h2 className='text-4xl md:text-5xl font-bold text-slate-900 leading-tight mb-6'>
                 أرقام تعكس
@@ -150,29 +204,40 @@ const Home = () => {
               </Link>
             </div>
 
-            {/* Right - Animated Stats */}
             <div className='space-y-5'>
-              <StatCard
-                end={500}
-                label='مستخدم نشط'
-                icon={<Users size={28} />}
-                barColor='bg-teal-600'
-                delay={0}
-              />
-              <StatCard
-                end={200}
-                label='متطوع موثوق'
-                icon={<HandHeart size={28} />}
-                barColor='bg-emerald-600'
-                delay={200}
-              />
-              <StatCard
-                end={1000}
-                label='طلب مساعدة'
-                icon={<CheckCircle2 size={28} />}
-                barColor='bg-cyan-600'
-                delay={400}
-              />
+              {statsLoaded ? (
+                <>
+                  <StatCard
+                    end={stats.users}
+                    label='مستخدم مسجّل'
+                    icon={<Users size={28} />}
+                    barColor='bg-teal-600'
+                    delay={0}
+                  />
+                  <StatCard
+                    end={stats.volunteers}
+                    label='متطوع موثوق'
+                    icon={<HandHeart size={28} />}
+                    barColor='bg-emerald-600'
+                    delay={200}
+                  />
+                  <StatCard
+                    end={stats.requests}
+                    label='طلب مساعدة'
+                    icon={<CheckCircle2 size={28} />}
+                    barColor='bg-cyan-600'
+                    delay={400}
+                  />
+                </>
+              ) : (
+                // هيكل تحميل بسيط
+                [1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className='h-24 rounded-2xl bg-stone-100 animate-pulse'
+                  />
+                ))
+              )}
             </div>
           </div>
         </div>
